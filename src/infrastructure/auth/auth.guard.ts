@@ -10,19 +10,21 @@ import {
   type AuthenticatedCaller,
   type ProviderIdentityPort,
 } from "../../domain/ports/provider-identity.port";
+import { getAppConfig } from "../config/app-config";
 
 /**
  * Default adapter implementing ProviderIdentityPort (Section 2).
- * In 'noop' mode (default for local challenge evaluation), allows requests through while
- * still propagating optional bearer/provider identity claims.
- * In 'oidc' mode, validates the Bearer JWT structure and issuer/audience claims from an external IdP (e.g. Keycloak / Zitadel).
+ * AUTH_MODE=noop allows the request and records an anonymous caller.
+ * AUTH_MODE=strict requires a Bearer token and reads `sub`, `provider_id` and `scope`
+ * from the JWT payload. Signature verification via the IdP JWKS is the extension
+ * point of this port; it is not implemented in this timebox.
  */
 @Injectable()
 export class ConfigurableProviderIdentityAdapter implements ProviderIdentityPort {
   async verifyCaller(
     headers: Record<string, string | string[] | undefined>,
   ): Promise<AuthenticatedCaller> {
-    const authMode = process.env.AUTH_MODE ?? "noop";
+    const authMode = getAppConfig().authMode;
     const rawAuth = headers["authorization"];
     const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
 

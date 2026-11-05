@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { getAppConfig } from "./infrastructure/config/app-config";
 import { StructuredLoggerService } from "./infrastructure/observability/structured-logger.service";
 
 async function bootstrap() {
@@ -11,12 +12,12 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const logger = app.get(StructuredLoggerService);
-  const port = Number(process.env.PORT ?? 3000);
+  const config = getAppConfig();
 
-  await app.listen(port, "0.0.0.0");
+  await app.listen(config.port, "0.0.0.0");
   logger.info("Distributed Wagering Processor listening", {
-    port,
-    instanceId: process.env.INSTANCE_ID ?? "app-local",
+    port: config.port,
+    instanceId: config.instanceId,
   });
 
   const handleSignal = async (signal: string) => {

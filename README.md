@@ -43,22 +43,37 @@ As 3 instâncias da aplicação ficam expostas em:
 - **Docker** & **Docker Compose**
 - **Bun 1.x** (`>= 1.1`)
 
+### Configuração
+
+As variáveis ficam em [`.env.example`](./.env.example). Nada de host, senha ou nome de fila fica fixo no código da aplicação: `getAppConfig()` lê o ambiente do processo.
+
+```bash
+cp .env.example .env
+```
+
+O Bun carrega `.env` sozinho. Se o arquivo não existir e `NODE_ENV` não for `production`, os valores que faltarem são preenchidos a partir de `.env.example`.
+
+O Compose injeta o mesmo arquivo nos containers e sobrescreve só o que muda dentro da rede: `DB_HOST=postgres`, `SQS_ENDPOINT=http://localstack:4566`, `INSTANCE_ID` e `AUTO_MIGRATE` (apenas `app-1` migra). Postgres e LocalStack usam as mesmas variáveis, com default igual ao exemplo quando não há `.env`. Para trocar usuário, senha ou fila, edite `.env` e suba a stack de novo.
+
 ### Instalação e Setup Local
 
 ```bash
 # 1. Instalar dependências
 bun install
 
-# 2. Subir PostgreSQL e LocalStack em containers
+# 2. Configuração local (opcional se for usar só os defaults de .env.example)
+cp .env.example .env
+
+# 3. Subir PostgreSQL e LocalStack em containers
 docker compose -f infra/docker-compose.yaml up -d postgres localstack
 
-# 3. Executar migrations versionadas
+# 4. Executar migrations versionadas
 bun run migration:up
 
 # (Opcional) Reverter última migration
 bun run migration:down
 
-# 4. Iniciar a aplicação localmente
+# 5. Iniciar a aplicação localmente
 bun run start
 ```
 

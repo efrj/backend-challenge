@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { getAppConfig } from "../config/app-config";
 
 export interface LogContext {
   correlationId?: string;
@@ -27,8 +28,8 @@ const REDACTED_KEYS = new Set([
 
 @Injectable()
 export class StructuredLoggerService {
-  private readonly instanceId = process.env.INSTANCE_ID ?? "app-local";
-  private readonly silent = process.env.LOG_SILENT === "true";
+  private readonly instanceId = getAppConfig().instanceId;
+  private readonly silent = getAppConfig().logSilent;
 
   info(message: string, context: LogContext = {}): void {
     this.write("INFO", message, context);

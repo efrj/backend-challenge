@@ -13,6 +13,7 @@ import {
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { OutboxMessage } from "../../domain/messaging/outbox-message";
+import { getAppConfig } from "../config/app-config";
 import { StructuredLoggerService } from "../observability/structured-logger.service";
 
 export interface SqsWagerMessageData {
@@ -54,19 +55,17 @@ export class SqsService implements OnModuleInit, OnModuleDestroy {
     @Inject(StructuredLoggerService)
     private readonly logger: StructuredLoggerService,
   ) {
-    this.wagerQueueName =
-      process.env.SQS_WAGER_QUEUE_NAME ?? "wager-transactions.fifo";
-    this.wagerDlqName =
-      process.env.SQS_WAGER_DLQ_NAME ?? "wager-transactions-dlq.fifo";
-    this.eventsQueueName =
-      process.env.SQS_EVENTS_QUEUE_NAME ?? "wager-integration-events.fifo";
+    const config = getAppConfig();
+    this.wagerQueueName = config.sqs.wagerQueueName;
+    this.wagerDlqName = config.sqs.wagerDlqName;
+    this.eventsQueueName = config.sqs.eventsQueueName;
 
     this.client = new SQSClient({
-      region: process.env.AWS_REGION ?? "us-east-1",
-      endpoint: process.env.SQS_ENDPOINT ?? "http://localhost:4566",
+      region: config.aws.region,
+      endpoint: config.sqs.endpoint,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "test",
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "test",
+        accessKeyId: config.aws.accessKeyId,
+        secretAccessKey: config.aws.secretAccessKey,
       },
     });
   }
@@ -96,15 +95,16 @@ export class SqsService implements OnModuleInit, OnModuleDestroy {
         }),
       );
       const canonicalDlqArn = canonicalDlqAttrs.Attributes?.QueueArn;
+      const queueSettings = getAppConfig().sqs;
       await this.getOrCreateQueue("wager-transactions.fifo", {
         FifoQueue: "true",
         ContentBasedDeduplication: "false",
-        VisibilityTimeout: "30",
+        VisibilityTimeout: String(queueSettings.visibilityTimeoutSec),
         ...(canonicalDlqArn
           ? {
               RedrivePolicy: JSON.stringify({
                 deadLetterTargetArn: canonicalDlqArn,
-                maxReceiveCount: "3",
+                maxReceiveCount: String(queueSettings.maxReceiveCount),
               }),
             }
           : {}),
@@ -126,11 +126,12 @@ export class SqsService implements OnModuleInit, OnModuleDestroy {
     const dlqArn = dlqAttrs.Attributes?.QueueArn;
 
     // 2. Main Wager Transactions FIFO Queue with RedrivePolicy to DLQ
-    const maxReceiveCount = process.env.SQS_MAX_RECEIVE_COUNT ?? "3";
+    const queueSettings = getAppConfig().sqs;
+    const maxReceiveCount = String(queueSettings.maxReceiveCount);
     const mainAttrs: Record<string, string> = {
       FifoQueue: "true",
       ContentBasedDeduplication: "false",
-      VisibilityTimeout: process.env.SQS_VISIBILITY_TIMEOUT_SEC ?? "30",
+      VisibilityTimeout: String(queueSettings.visibilityTimeoutSec),
     };
     if (dlqArn) {
       mainAttrs.RedrivePolicy = JSON.stringify({

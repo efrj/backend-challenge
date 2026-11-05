@@ -10,6 +10,7 @@ import { PendingReferenceWorker } from "../../src/application/workers/pending-re
 import { SqsWagerConsumerWorker } from "../../src/application/workers/sqs-wager-consumer.worker";
 import { SqsService } from "../../src/infrastructure/messaging/sqs.service";
 import { DatabaseMigratorService } from "../../src/infrastructure/persistence/database-migrator.service";
+import { getAppConfig, loadEnvFiles } from "../../src/infrastructure/config/app-config";
 import { WalletRecord } from "../../src/infrastructure/persistence/entities/records";
 
 export interface TestAppInstance {
@@ -30,11 +31,12 @@ let testDbInitialized = false;
 
 async function ensureTestDatabaseExists(dbName: string): Promise<void> {
   if (testDbInitialized) return;
+  const config = getAppConfig();
   const client = new Client({
-    host: process.env.DB_HOST ?? "localhost",
-    port: Number(process.env.DB_PORT ?? 5432),
-    user: process.env.DB_USER ?? "jungle",
-    password: process.env.DB_PASSWORD ?? "jungle_secret",
+    host: config.db.host,
+    port: config.db.port,
+    user: config.db.user,
+    password: config.db.password,
     database: "postgres",
   });
   await client.connect();
@@ -56,7 +58,8 @@ export async function createTestAppInstance(options?: {
   workersEnabled?: boolean;
   instanceId?: string;
 }): Promise<TestAppInstance> {
-  const testDbName = process.env.TEST_DB_NAME ?? "wagering_test_db";
+  loadEnvFiles();
+  const testDbName = process.env.TEST_DB_NAME?.trim() || "wagering_test_db";
   await ensureTestDatabaseExists(testDbName);
 
   process.env.DB_NAME = testDbName;

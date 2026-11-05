@@ -381,8 +381,10 @@ describe("Concurrency & Resilience Suite (Real Parallelism across >= 3 Instances
       publishedIds.push(msg.id);
     };
 
-    // Run Publisher 1 and Publisher 2 concurrently in parallel batches until outbox is drained
-    for (let round = 0; round < 5; round++) {
+    // Run Publisher 1 and Publisher 2 concurrently in parallel batches until outbox is drained.
+    // The shared test database keeps rows from earlier scenarios, so the round cap
+    // has to cover that backlog, not a single batch.
+    for (let round = 0; round < 40; round++) {
       const [c1, c2] = await Promise.all([
         instances[0].outboxWorker.publishBatch(15, customPublish),
         instances[1].outboxWorker.publishBatch(15, customPublish),

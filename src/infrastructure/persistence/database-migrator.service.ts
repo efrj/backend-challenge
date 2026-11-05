@@ -1,5 +1,6 @@
 import { MikroORM } from "@mikro-orm/postgresql";
 import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
+import { getAppConfig } from "../config/app-config";
 import { StructuredLoggerService } from "../observability/structured-logger.service";
 
 @Injectable()
@@ -11,7 +12,7 @@ export class DatabaseMigratorService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    if (process.env.AUTO_MIGRATE === "false") {
+    if (!getAppConfig().autoMigrate) {
       return;
     }
     await this.migrateUp();

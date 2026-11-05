@@ -20,6 +20,7 @@ import {
 } from "../../infrastructure/messaging/sqs.service";
 import { MetricsService } from "../../infrastructure/observability/metrics.service";
 import { StructuredLoggerService } from "../../infrastructure/observability/structured-logger.service";
+import { getAppConfig } from "../../infrastructure/config/app-config";
 import { ProcessWagerTransactionUseCase } from "../use-cases/process-wager-transaction.use-case";
 
 export const SQS_WAGER_CONSUMER_NAME = "sqs-wager-transaction-consumer";
@@ -48,7 +49,7 @@ export class SqsWagerConsumerWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    if (process.env.WORKERS_ENABLED === "false") {
+    if (!getAppConfig().workersEnabled) {
       return;
     }
     this.start();
@@ -171,7 +172,6 @@ export class SqsWagerConsumerWorker implements OnModuleInit, OnModuleDestroy {
       const receiveCount = Number(
         msg.Attributes?.ApproximateReceiveCount ?? "1",
       );
-      const maxReceiveCount = Number(process.env.SQS_MAX_RECEIVE_COUNT ?? "3");
 
       if (this.beforeProcessHook) {
         await this.beforeProcessHook(messageId, receiveCount);
@@ -239,7 +239,7 @@ export class SqsWagerConsumerWorker implements OnModuleInit, OnModuleDestroy {
     const receiveCount = Number(
       msg.Attributes?.ApproximateReceiveCount ?? "1",
     );
-    const maxReceiveCount = Number(process.env.SQS_MAX_RECEIVE_COUNT ?? "3");
+    const maxReceiveCount = getAppConfig().sqs.maxReceiveCount;
 
     // Permanent contract/validation/conflict errors -> move immediately to DLQ
     if (

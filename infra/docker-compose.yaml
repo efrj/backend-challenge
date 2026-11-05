@@ -1,5 +1,24 @@
 name: jungle-wagering-processor
 
+# Hostnames that only exist on the compose network.
+# Every other setting is read from ../.env.example (and ../.env when present).
+x-app-build: &app-build
+  context: ..
+  dockerfile: infra/Dockerfile
+
+x-app-env-files: &app-env-files
+  - ../.env.example
+  - path: ../.env
+    required: false
+
+x-app-docker-env: &app-docker-env
+  NODE_ENV: production
+  PORT: "3000"
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  SQS_ENDPOINT: http://localstack:4566
+  WORKERS_ENABLED: "true"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -27,10 +46,15 @@ services:
     restart: unless-stopped
     environment:
       SERVICES: sqs
-      AWS_DEFAULT_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
       LS_LOG: warn
+      SQS_WAGER_QUEUE_NAME: ${SQS_WAGER_QUEUE_NAME:-wager-transactions.fifo}
+      SQS_WAGER_DLQ_NAME: ${SQS_WAGER_DLQ_NAME:-wager-transactions-dlq.fifo}
+      SQS_EVENTS_QUEUE_NAME: ${SQS_EVENTS_QUEUE_NAME:-wager-integration-events.fifo}
+      SQS_MAX_RECEIVE_COUNT: ${SQS_MAX_RECEIVE_COUNT:-3}
+      SQS_VISIBILITY_TIMEOUT_SEC: ${SQS_VISIBILITY_TIMEOUT_SEC:-30}
     ports:
       - "${SQS_PORT:-4566}:4566"
     volumes:
@@ -43,34 +67,19 @@ services:
       retries: 20
 
   app-1:
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile
+    build: *app-build
     container_name: jungle-wagering-app-1
     restart: unless-stopped
+    env_file: *app-env-files
     depends_on:
       postgres:
         condition: service_healthy
       localstack:
         condition: service_healthy
     environment:
-      NODE_ENV: production
-      PORT: 3000
+      <<: *app-docker-env
       INSTANCE_ID: app-1
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-jungle}
-      DB_PASSWORD: ${DB_PASSWORD:-jungle_secret}
-      DB_NAME: ${DB_NAME:-wagering_db}
-      AWS_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      SQS_ENDPOINT: http://localstack:4566
-      SQS_WAGER_QUEUE_NAME: wager-transactions.fifo
-      SQS_WAGER_DLQ_NAME: wager-transactions-dlq.fifo
-      SQS_EVENTS_QUEUE_NAME: wager-integration-events.fifo
       AUTO_MIGRATE: "true"
-      WORKERS_ENABLED: "true"
     ports:
       - "3000:3000"
     healthcheck:
@@ -80,11 +89,10 @@ services:
       retries: 10
 
   app-2:
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile
+    build: *app-build
     container_name: jungle-wagering-app-2
     restart: unless-stopped
+    env_file: *app-env-files
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,32 +101,17 @@ services:
       app-1:
         condition: service_healthy
     environment:
-      NODE_ENV: production
-      PORT: 3000
+      <<: *app-docker-env
       INSTANCE_ID: app-2
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-jungle}
-      DB_PASSWORD: ${DB_PASSWORD:-jungle_secret}
-      DB_NAME: ${DB_NAME:-wagering_db}
-      AWS_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      SQS_ENDPOINT: http://localstack:4566
-      SQS_WAGER_QUEUE_NAME: wager-transactions.fifo
-      SQS_WAGER_DLQ_NAME: wager-transactions-dlq.fifo
-      SQS_EVENTS_QUEUE_NAME: wager-integration-events.fifo
       AUTO_MIGRATE: "false"
-      WORKERS_ENABLED: "true"
     ports:
       - "3001:3000"
 
   app-3:
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile
+    build: *app-build
     container_name: jungle-wagering-app-3
     restart: unless-stopped
+    env_file: *app-env-files
     depends_on:
       postgres:
         condition: service_healthy
@@ -127,22 +120,8 @@ services:
       app-1:
         condition: service_healthy
     environment:
-      NODE_ENV: production
-      PORT: 3000
+      <<: *app-docker-env
       INSTANCE_ID: app-3
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-jungle}
-      DB_PASSWORD: ${DB_PASSWORD:-jungle_secret}
-      DB_NAME: ${DB_NAME:-wagering_db}
-      AWS_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      SQS_ENDPOINT: http://localstack:4566
-      SQS_WAGER_QUEUE_NAME: wager-transactions.fifo
-      SQS_WAGER_DLQ_NAME: wager-transactions-dlq.fifo
-      SQS_EVENTS_QUEUE_NAME: wager-integration-events.fifo
       AUTO_MIGRATE: "false"
-      WORKERS_ENABLED: "true"
     ports:
       - "3002:3000"

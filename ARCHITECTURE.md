@@ -107,6 +107,7 @@ Para suportar **50 envios paralelos da mesma aposta** em múltiplas instâncias 
                               └─────────────────┘   └─────────────────┘
 ```
 - `PROCESSED`, `REJECTED` e `FAILED` são **terminais**: qualquer tentativa de transição a partir deles lança `InvalidTransactionStateError`.
+- Uma referência `PROCESSED` aceita **uma** reversão, seja `REFUND` ou `ROLLBACK`. O índice parcial `uq_wager_tx_single_reversal_per_reference` e o `failureCode` `ALREADY_REVERSED` tratam os dois kinds como a mesma reversão financeira, para não creditar a aposta duas vezes. Mensagens SQS permanentemente inválidas vão para a DLQ sem linha `FAILED`: não há transação persistida para auditar.
 - **Referências fora de ordem (`PENDING_REFERENCE`)**: Quando um `REFUND` ou `ROLLBACK` chega antes da transação referenciada (`BET`/`WIN`/`REFUND`), ele é persistido como `PENDING_REFERENCE` (emitindo `WagerTransactionPendingReference` na outbox). O `PendingReferenceWorker` reprocessa periodicamente os registros devidos com **backoff exponencial** ($200\text{ms} \times 2^{\text{attempt}}$) até `PENDING_REF_MAX_ATTEMPTS` (default: 5). Se a referência chegar nesse intervalo, a reversão é aplicada; se esgotar o limite, transiciona para `REJECTED` com `failureCode = REFERENCE_NOT_FOUND` e publica `WagerTransactionRejected`.
 
 ### 5.2 Taxonomia de `FailureCode` e Mapeamento HTTP
@@ -143,6 +144,7 @@ Outros códigos HTTP padronizados:
    - No `SIGTERM`, interrompe o polling, aguarda o término das mensagens em voo e devolve a visibilidade (`VisibilityTimeout = 0`) caso alguma não termine a tempo.
 2. **Transactional Outbox (`OutboxPublisherWorker`)**:
    - Utiliza `SELECT ... FROM outbox_messages WHERE published_at IS NULL AND (next_attempt_at IS NULL OR next_attempt_at <= NOW()) ORDER BY occurred_at ASC LIMIT 25 FOR UPDATE SKIP LOCKED`.
+   - O `SELECT` e os `UPDATE` passam o `transactionContext` do MikroORM para `Connection.execute`. Sem isso o driver abre outra conexão em autocommit, o `FOR UPDATE` é liberado antes do publish e dois publishers podem reclamar a mesma linha.
    - Permite múltiplos publishers concorrentes em diferentes instâncias sem contenção nem perda de eventos, publicando na fila FIFO `wager-integration-events.fifo` com `MessageDeduplicationId = eventId` e `MessageGroupId = aggregateId`.
 
 ---
@@ -152,9 +154,8 @@ Outros códigos HTTP padronizados:
 Conforme permitido pela Seção 2, priorizamos 100% do foco em correção financeira, concorrência, idempotência e resiliência, deixando a porta de autenticação explícita no domínio (`ProviderIdentityPort` em `src/domain/ports/provider-identity.port.ts`) e aplicada nos controllers de negócio via `ProviderAuthGuard` (`src/infrastructure/auth/auth.guard.ts`), mantendo `/health/live` e `/health/ready` abertos.
 
 - **Modo padrão (`AUTH_MODE=noop`)**: Permite execução direta dos testes automatizados e chamadas locais sem exigir container extra de IdP.
-- **Desenho para Produção com Keycloak / Zitadel (`AUTH_MODE=strict`)**:
-  - Cada provedor de jogos autentica-se via OAuth2 `client_credentials` no **Keycloak** ou **Zitadel**, recebendo um Access Token JWT assinado (`RS256`/`ES256`) contendo a claim customizada `provider_id` e escopos `wagering:write`, `wagering:read`.
-  - O adaptador `ProviderIdentityPort` valida a assinatura via JWKS endpoint cacheado do IdP e garante que `caller.providerId === body.providerId`, impedindo *spoofing* entre provedores.
+- **Modo estrito neste repositório (`AUTH_MODE=strict`)**: exige header `Authorization: Bearer` e lê `sub`, `provider_id` e `scope` do payload do JWT. Não valida assinatura.
+- **Desenho de produção (não implementado neste timebox)**: Keycloak ou Zitadel emitem o access token via `client_credentials`. O mesmo `ProviderIdentityPort` passaria a validar a assinatura no JWKS do IdP e a recusar a chamada quando `caller.providerId` divergir do `providerId` do corpo. Health checks continuam sem guarda.
 
 ---
 

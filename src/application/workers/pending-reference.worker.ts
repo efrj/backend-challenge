@@ -5,6 +5,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
+import { getAppConfig } from "../../infrastructure/config/app-config";
 import { StructuredLoggerService } from "../../infrastructure/observability/structured-logger.service";
 import { ProcessWagerTransactionUseCase } from "../use-cases/process-wager-transaction.use-case";
 
@@ -23,7 +24,7 @@ export class PendingReferenceWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    if (process.env.WORKERS_ENABLED === "false") {
+    if (!getAppConfig().workersEnabled) {
       return;
     }
     this.start();
@@ -36,7 +37,7 @@ export class PendingReferenceWorker implements OnModuleInit, OnModuleDestroy {
   start(): void {
     if (this.running) return;
     this.running = true;
-    const intervalMs = Number(process.env.PENDING_REF_POLL_INTERVAL_MS ?? 250);
+    const intervalMs = getAppConfig().pendingRefPollIntervalMs;
     this.timer = setInterval(() => {
       if (!this.running || this.inFlightPromise) return;
       this.inFlightPromise = this.processDuePendingReferences()

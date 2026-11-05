@@ -27,6 +27,7 @@ import {
    LedgerDirection,
   WalletLedgerEntry,
 } from "../../domain/wallet/wallet-ledger-entry";
+import { getAppConfig } from "../../infrastructure/config/app-config";
 import { MetricsService } from "../../infrastructure/observability/metrics.service";
 import { StructuredLoggerService } from "../../infrastructure/observability/structured-logger.service";
 import {
@@ -334,9 +335,8 @@ export class ProcessWagerTransactionUseCase {
           refRecord.status === WagerTransactionStatus.PendingReference
         ) {
           if (tx.requiresReference()) {
-            const firstRetryDelayMs = Number(
-              process.env.PENDING_REF_INITIAL_BACKOFF_MS ?? 200,
-            );
+            const firstRetryDelayMs =
+              getAppConfig().pendingRefInitialBackoffMs;
             tx.markPendingReference(
               new Date(now.getTime() + firstRetryDelayMs),
               wallet.balance,
@@ -511,8 +511,8 @@ export class ProcessWagerTransactionUseCase {
    */
   async reprocessPendingReference(
     transactionId: string,
-    maxAttempts = Number(process.env.PENDING_REF_MAX_ATTEMPTS ?? 5),
-    baseDelayMs = Number(process.env.PENDING_REF_INITIAL_BACKOFF_MS ?? 200),
+    maxAttempts = getAppConfig().pendingRefMaxAttempts,
+    baseDelayMs = getAppConfig().pendingRefInitialBackoffMs,
   ): Promise<WagerTransactionStatus> {
     const fork = this.em.fork();
     const now = new Date();

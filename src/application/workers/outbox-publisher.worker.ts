@@ -6,6 +6,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { OutboxMessage } from "../../domain/messaging/outbox-message";
+import { getAppConfig } from "../../infrastructure/config/app-config";
 import { SqsService } from "../../infrastructure/messaging/sqs.service";
 import { MetricsService } from "../../infrastructure/observability/metrics.service";
 import { StructuredLoggerService } from "../../infrastructure/observability/structured-logger.service";
@@ -29,7 +30,7 @@ export class OutboxPublisherWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    if (process.env.WORKERS_ENABLED === "false") {
+    if (!getAppConfig().workersEnabled) {
       return;
     }
     this.start();
@@ -42,7 +43,7 @@ export class OutboxPublisherWorker implements OnModuleInit, OnModuleDestroy {
   start(): void {
     if (this.running) return;
     this.running = true;
-    const intervalMs = Number(process.env.OUTBOX_POLL_INTERVAL_MS ?? 200);
+    const intervalMs = getAppConfig().outboxPollIntervalMs;
     this.timer = setInterval(() => {
       if (!this.running || this.inFlightPromise) return;
       this.inFlightPromise = this.publishBatch()
@@ -83,6 +84,11 @@ export class OutboxPublisherWorker implements OnModuleInit, OnModuleDestroy {
     let publishedCount = 0;
 
     await fork.transactional(async (txEm) => {
+      const trx = txEm.getTransactionContext();
+      if (!trx) {
+        throw new Error("Outbox publisher requires an active database transaction");
+      }
+
       const rows = await txEm
         .getConnection()
         .execute<
@@ -105,6 +111,8 @@ export class OutboxPublisherWorker implements OnModuleInit, OnModuleDestroy {
            LIMIT ?
            FOR UPDATE SKIP LOCKED`,
           [now.toISOString(), batchSize],
+          "all",
+          trx,
         );
 
       for (const row of rows) {
@@ -143,6 +151,8 @@ export class OutboxPublisherWorker implements OnModuleInit, OnModuleDestroy {
                SET published_at = ?, next_attempt_at = NULL
                WHERE id = ?`,
               [publishNow.toISOString(), outboxMsg.id],
+              "run",
+              trx,
             );
           publishedCount += 1;
         } catch (err) {
@@ -160,6 +170,8 @@ export class OutboxPublisherWorker implements OnModuleInit, OnModuleDestroy {
                 outboxMsg.nextAttemptAt?.toISOString() ?? null,
                 outboxMsg.id,
               ],
+              "run",
+              trx,
             );
           this.logger.warn("Failed to publish outbox message; retry scheduled", {
             outboxId: outboxMsg.id,

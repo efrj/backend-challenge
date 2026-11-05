@@ -1,5 +1,6 @@
 import { Migrator } from "@mikro-orm/migrations";
 import { defineConfig, Options } from "@mikro-orm/postgresql";
+import { getAppConfig } from "../config/app-config";
 import {
   InboxMessageSchema,
   OutboxMessageSchema,
@@ -10,12 +11,13 @@ import {
 import { Migration20260101000000_InitialSchema } from "./migrations/Migration20260101000000_InitialSchema";
 
 export function createMikroOrmOptions(overrides: Partial<Options> = {}): Options {
+  const config = getAppConfig();
   return defineConfig({
-    host: process.env.DB_HOST ?? "localhost",
-    port: Number(process.env.DB_PORT ?? 5432),
-    user: process.env.DB_USER ?? "jungle",
-    password: process.env.DB_PASSWORD ?? "jungle_secret",
-    dbName: process.env.DB_NAME ?? "wagering_db",
+    host: config.db.host,
+    port: config.db.port,
+    user: config.db.user,
+    password: config.db.password,
+    dbName: config.db.name,
     entities: [
       WalletSchema,
       WagerTransactionSchema,
@@ -36,7 +38,7 @@ export function createMikroOrmOptions(overrides: Partial<Options> = {}): Options
     },
     pool: {
       min: 1,
-      max: Number(process.env.DB_POOL_MAX ?? 15),
+      max: config.db.poolMax,
     },
     debug: false,
     ...overrides,
