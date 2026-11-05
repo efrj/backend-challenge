@@ -1,0 +1,148 @@
+name: jungle-wagering-processor
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jungle-wagering-postgres
+    restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=300"]
+    environment:
+      POSTGRES_USER: ${DB_USER:-jungle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-jungle_secret}
+      POSTGRES_DB: ${DB_NAME:-wagering_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-jungle} -d ${DB_NAME:-wagering_db}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: jungle-wagering-localstack
+    restart: unless-stopped
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      LS_LOG: warn
+    ports:
+      - "${SQS_PORT:-4566}:4566"
+    volumes:
+      - ./data/localstack:/var/lib/localstack
+      - ./scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  app-1:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: jungle-wagering-app-1
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      INSTANCE_ID: app-1
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-jungle}
+      DB_PASSWORD: ${DB_PASSWORD:-jungle_secret}
+      DB_NAME: ${DB_NAME:-wagering_db}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_ENDPOINT: http://localstack:4566
+      SQS_WAGER_QUEUE_NAME: wager-transactions.fifo
+      SQS_WAGER_DLQ_NAME: wager-transactions-dlq.fifo
+      SQS_EVENTS_QUEUE_NAME: wager-integration-events.fifo
+      AUTO_MIGRATE: "true"
+      WORKERS_ENABLED: "true"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e 'fetch(\"http://localhost:3000/health/ready\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app-2:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: jungle-wagering-app-2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      app-1:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      INSTANCE_ID: app-2
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-jungle}
+      DB_PASSWORD: ${DB_PASSWORD:-jungle_secret}
+      DB_NAME: ${DB_NAME:-wagering_db}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_ENDPOINT: http://localstack:4566
+      SQS_WAGER_QUEUE_NAME: wager-transactions.fifo
+      SQS_WAGER_DLQ_NAME: wager-transactions-dlq.fifo
+      SQS_EVENTS_QUEUE_NAME: wager-integration-events.fifo
+      AUTO_MIGRATE: "false"
+      WORKERS_ENABLED: "true"
+    ports:
+      - "3001:3000"
+
+  app-3:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: jungle-wagering-app-3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      app-1:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      INSTANCE_ID: app-3
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-jungle}
+      DB_PASSWORD: ${DB_PASSWORD:-jungle_secret}
+      DB_NAME: ${DB_NAME:-wagering_db}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_ENDPOINT: http://localstack:4566
+      SQS_WAGER_QUEUE_NAME: wager-transactions.fifo
+      SQS_WAGER_DLQ_NAME: wager-transactions-dlq.fifo
+      SQS_EVENTS_QUEUE_NAME: wager-integration-events.fifo
+      AUTO_MIGRATE: "false"
+      WORKERS_ENABLED: "true"
+    ports:
+      - "3002:3000"
