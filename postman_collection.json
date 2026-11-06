@@ -85,18 +85,7 @@
               ]
             },
             "url": {
-              "raw": "http://localhost:8000/api/login/oauth/access_token",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8000",
-              "path": [
-                "api",
-                "login",
-                "oauth",
-                "access_token"
-              ]
+              "raw": "http://localhost:8000/api/login/oauth/access_token"
             }
           }
         },
@@ -139,18 +128,7 @@
               ]
             },
             "url": {
-              "raw": "http://localhost:8000/api/login/oauth/access_token",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8000",
-              "path": [
-                "api",
-                "login",
-                "oauth",
-                "access_token"
-              ]
+              "raw": "http://localhost:8000/api/login/oauth/access_token"
             }
           }
         }
@@ -178,13 +156,7 @@
               "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"initialBalance\": {\n    \"amount\": \"1000.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wallets",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallets"
-              ]
+              "raw": "{{baseUrl}}/wallets"
             }
           }
         },
@@ -194,14 +166,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/wallets/{{walletId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallets",
-                "{{walletId}}"
-              ]
+              "raw": "{{baseUrl}}/wallets/{{walletId}}"
             }
           }
         },
@@ -212,14 +177,6 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/wallets/{{walletId}}/ledger?limit=50",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallets",
-                "{{walletId}}",
-                "ledger"
-              ],
               "query": [
                 {
                   "key": "limit",
@@ -245,15 +202,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/wallets/{{walletId}}/reconciliation",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wallets",
-                "{{walletId}}",
-                "reconciliation"
-              ]
+              "raw": "{{baseUrl}}/wallets/{{walletId}}/reconciliation"
             }
           }
         }
@@ -285,14 +234,7 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"bet-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"BET\",\n  \"money\": {\n    \"amount\": \"25.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wagering",
-                "transactions"
-              ]
+              "raw": "{{baseUrl}}/wagering/transactions"
             }
           }
         },
@@ -319,14 +261,7 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"win-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"WIN\",\n  \"money\": {\n    \"amount\": \"50.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wagering",
-                "transactions"
-              ]
+              "raw": "{{baseUrl}}/wagering/transactions"
             }
           }
         },
@@ -353,14 +288,7 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"loss-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"LOSS\",\n  \"money\": {\n    \"amount\": \"0.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wagering",
-                "transactions"
-              ]
+              "raw": "{{baseUrl}}/wagering/transactions"
             }
           }
         },
@@ -387,14 +315,7 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"refund-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"REFUND\",\n  \"money\": {\n    \"amount\": \"25.00\",\n    \"currency\": \"BRL\"\n  },\n  \"referenceExternalTransactionId\": \"<ORIGINAL_BET_EXTERNAL_ID>\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wagering",
-                "transactions"
-              ]
+              "raw": "{{baseUrl}}/wagering/transactions"
             }
           }
         },
@@ -405,14 +326,6 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/wagering/transactions/:transactionId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "wagering",
-                "transactions",
-                ":transactionId"
-              ],
               "variable": [
                 {
                   "key": "transactionId",
@@ -429,16 +342,6 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/providers/:providerId/wagering/transactions/:externalTransactionId",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "providers",
-                ":providerId",
-                "wagering",
-                "transactions",
-                ":externalTransactionId"
-              ],
               "variable": [
                 {
                   "key": "providerId",
@@ -466,14 +369,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/health/live",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "health",
-                "live"
-              ]
+              "raw": "{{baseUrl}}/health/live"
             }
           }
         },
@@ -486,14 +382,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/health/ready",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "health",
-                "ready"
-              ]
+              "raw": "{{baseUrl}}/health/ready"
             }
           }
         },
@@ -506,13 +395,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/metrics",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "metrics"
-              ]
+              "raw": "{{baseUrl}}/metrics"
             }
           }
         },
@@ -525,14 +408,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/metrics/json",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "metrics",
-                "json"
-              ]
+              "raw": "{{baseUrl}}/metrics/json"
             }
           }
         }
