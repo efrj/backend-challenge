@@ -1,0 +1,386 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/wallets": {
+      "post": {
+        "description": "Cria a carteira e gera atomicamente o lançamento inicial de crédito no ledger.",
+        "operationId": "WalletsController_createWallet",
+        "parameters": [
+          {
+            "name": "x-correlation-id",
+            "required": false,
+            "in": "header",
+            "description": "Identificador de rastreamento distribuído",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Carteira criada com sucesso"
+          },
+          "400": {
+            "description": "Dados de entrada inválidos"
+          },
+          "409": {
+            "description": "Jogador já possui carteira nesta moeda"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Criar carteira para jogador com saldo inicial",
+        "tags": [
+          "Wallets"
+        ]
+      }
+    },
+    "/wallets/{walletId}": {
+      "get": {
+        "operationId": "WalletsController_getWallet",
+        "parameters": [
+          {
+            "name": "walletId",
+            "required": true,
+            "in": "path",
+            "description": "UUID da carteira",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dados da carteira"
+          },
+          "404": {
+            "description": "Carteira não encontrada"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Consultar carteira e saldo materializado",
+        "tags": [
+          "Wallets"
+        ]
+      }
+    },
+    "/wallets/{walletId}/ledger": {
+      "get": {
+        "description": "Paginação via cursor opaco e estável.",
+        "operationId": "WalletsController_getWalletLedger",
+        "parameters": [
+          {
+            "name": "walletId",
+            "required": true,
+            "in": "path",
+            "description": "UUID da carteira",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor de paginação retornado no nextCursor anterior",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Quantidade máxima de registros (default: 50)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de lançamentos do ledger"
+          },
+          "404": {
+            "description": "Carteira não encontrada"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Consultar extrato contábil imutável (Ledger)",
+        "tags": [
+          "Wallets"
+        ]
+      }
+    },
+    "/wallets/{walletId}/reconciliation": {
+      "post": {
+        "description": "Calcula em tempo real a soma dos lançamentos do ledger com row lock e compara com o saldo persistido, reportando discrepâncias.",
+        "operationId": "WalletsController_reconcileWallet",
+        "parameters": [
+          {
+            "name": "walletId",
+            "required": true,
+            "in": "path",
+            "description": "UUID da carteira",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-correlation-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado da reconciliação contábil"
+          },
+          "404": {
+            "description": "Carteira não encontrada"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Executar reconciliação contábil da carteira",
+        "tags": [
+          "Wallets"
+        ]
+      }
+    },
+    "/wagering/transactions": {
+      "post": {
+        "description": "Processa atomicamente uma aposta com controle de concorrência por wallet, dedup persistente em 3 camadas e outbox transacional. Requer cabeçalho Idempotency-Key.",
+        "operationId": "WageringController_submitTransaction",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "description": "Chave única de idempotência do provedor (ex.: provider-a:tx-100)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-correlation-id",
+            "required": false,
+            "in": "header",
+            "description": "Identificador de rastreamento distribuído da chamada",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transação confirmada (PROCESSED) ou replay idempotente"
+          },
+          "202": {
+            "description": "Transação aceita em fila de dependência (PENDING_REFERENCE)"
+          },
+          "400": {
+            "description": "Dados de entrada inválidos ou cabeçalho ausente"
+          },
+          "401": {
+            "description": "Token Ausente ou Inválido (quando AUTH_MODE=casdoor)"
+          },
+          "403": {
+            "description": "Provedor autenticado não autorizado a operar em nome de outro (violação de tenant)"
+          },
+          "409": {
+            "description": "Conflito de idempotência: chave já usada com payload divergente"
+          },
+          "422": {
+            "description": "Rejeitado por regra de negócio (saldo insuficiente, moeda incompatível, etc.)"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Submeter transação de aposta (BET, WIN, LOSS, REFUND, ROLLBACK)",
+        "tags": [
+          "Wagering"
+        ]
+      }
+    },
+    "/wagering/transactions/{transactionId}": {
+      "get": {
+        "operationId": "WageringController_getTransactionById",
+        "parameters": [
+          {
+            "name": "transactionId",
+            "required": true,
+            "in": "path",
+            "description": "UUID interno gerado na criação da transação",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalhes da transação"
+          },
+          "404": {
+            "description": "Transação não encontrada"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Consultar transação pelo ID interno (UUID)",
+        "tags": [
+          "Wagering"
+        ]
+      }
+    },
+    "/providers/{providerId}/wagering/transactions/{externalTransactionId}": {
+      "get": {
+        "operationId": "WageringController_getTransactionByProviderAndExternalId",
+        "parameters": [
+          {
+            "name": "providerId",
+            "required": true,
+            "in": "path",
+            "description": "Identificador do provedor (ex.: provider-a)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalTransactionId",
+            "required": true,
+            "in": "path",
+            "description": "ID de transação fornecido pelo provedor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalhes da transação"
+          },
+          "403": {
+            "description": "Provedor autenticado não autorizado a ler recursos de outro"
+          },
+          "404": {
+            "description": "Transação não encontrada"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Consultar transação por provedor e ID externo",
+        "tags": [
+          "Wagering"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Processo saudável"
+          }
+        },
+        "summary": "Liveness probe: indica se o processo está ativo",
+        "tags": [
+          "Observability"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Todos os serviços dependentes acessíveis"
+          },
+          "503": {
+            "description": "PostgreSQL ou SQS indisponíveis"
+          }
+        },
+        "summary": "Readiness probe: valida conectividade com PostgreSQL e SQS",
+        "tags": [
+          "Observability"
+        ]
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "MetricsController_getPrometheusMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Texto puro de métricas Prometheus"
+          }
+        },
+        "summary": "Expor métricas em formato Prometheus para scrape",
+        "tags": [
+          "Observability"
+        ]
+      }
+    },
+    "/metrics/json": {
+      "get": {
+        "operationId": "MetricsController_getJsonMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Snapshot em JSON"
+          }
+        },
+        "summary": "Snapshot JSON das métricas internas e latências",
+        "tags": [
+          "Observability"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Distributed Wagering Processor API",
+    "description": "Serviço financeiro distribuído de processamento de apostas para provedores de jogos iGaming.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {}
+  }
+}

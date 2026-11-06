@@ -1,0 +1,353 @@
+{
+  "info": {
+    "_postman_id": "c1f7b822-0a14-4e20-94a2-7fa34bb25001",
+    "name": "Distributed Wagering Processor API",
+    "description": "Collection de endpoints para o Distributed Wagering Processor da Jungle Gaming, compatível com Postman e Insomnia.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "walletId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "playerId",
+      "value": "0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1",
+      "type": "string"
+    },
+    {
+      "key": "providerId",
+      "value": "provider-a",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "0. Autenticação (Casdoor)",
+      "item": [
+        {
+          "name": "Obter Token - Provider A (client_credentials)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials", "type": "text" },
+                { "key": "client_id", "value": "provider-a-client-id", "type": "text" },
+                { "key": "client_secret", "value": "provider-a-client-secret", "type": "text" },
+                { "key": "scope", "value": "openid profile wagering:write wagering:read", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/login/oauth/access_token",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "login", "oauth", "access_token"]
+            }
+          }
+        },
+        {
+          "name": "Obter Token - Provider B (client_credentials)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials", "type": "text" },
+                { "key": "client_id", "value": "provider-b-client-id", "type": "text" },
+                { "key": "client_secret", "value": "provider-b-client-secret", "type": "text" },
+                { "key": "scope", "value": "openid profile wagering:write wagering:read", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/login/oauth/access_token",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "login", "oauth", "access_token"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Wallets & Ledger",
+      "item": [
+        {
+          "name": "Criar Carteira",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-correlation-id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"initialBalance\": {\n    \"amount\": \"1000.00\",\n    \"currency\": \"BRL\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wallets",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallets"]
+            }
+          }
+        },
+        {
+          "name": "Consultar Carteira",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallets/{{walletId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallets", "{{walletId}}"]
+            }
+          }
+        },
+        {
+          "name": "Consultar Extrato (Ledger)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallets/{{walletId}}/ledger?limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallets", "{{walletId}}", "ledger"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "cursor", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reconciliação Contábil da Carteira",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-correlation-id", "value": "{{$guid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/wallets/{{walletId}}/reconciliation",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallets", "{{walletId}}", "reconciliation"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Wagering Transactions",
+      "item": [
+        {
+          "name": "Submeter Aposta (BET)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{providerId}}:bet-{{$timestamp}}" },
+              { "key": "x-correlation-id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"bet-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"BET\",\n  \"money\": {\n    \"amount\": \"25.00\",\n    \"currency\": \"BRL\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wagering/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["wagering", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Submeter Ganho (WIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{providerId}}:win-{{$timestamp}}" },
+              { "key": "x-correlation-id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"win-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"WIN\",\n  \"money\": {\n    \"amount\": \"50.00\",\n    \"currency\": \"BRL\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wagering/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["wagering", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Submeter Perda (LOSS)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{providerId}}:loss-{{$timestamp}}" },
+              { "key": "x-correlation-id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"loss-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"LOSS\",\n  \"money\": {\n    \"amount\": \"0.00\",\n    \"currency\": \"BRL\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wagering/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["wagering", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Submeter Reembolso (REFUND)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{providerId}}:refund-{{$timestamp}}" },
+              { "key": "x-correlation-id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"refund-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"REFUND\",\n  \"money\": {\n    \"amount\": \"25.00\",\n    \"currency\": \"BRL\"\n  },\n  \"referenceExternalTransactionId\": \"<ORIGINAL_BET_EXTERNAL_ID>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wagering/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["wagering", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Consultar Transação por UUID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wagering/transactions/:transactionId",
+              "host": ["{{baseUrl}}"],
+              "path": ["wagering", "transactions", ":transactionId"],
+              "variable": [
+                { "key": "transactionId", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Consultar Transação por Provedor e ID Externo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/providers/:providerId/wagering/transactions/:externalTransactionId",
+              "host": ["{{baseUrl}}"],
+              "path": ["providers", ":providerId", "wagering", "transactions", ":externalTransactionId"],
+              "variable": [
+                { "key": "providerId", "value": "provider-a" },
+                { "key": "externalTransactionId", "value": "" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Observabilidade & Health",
+      "item": [
+        {
+          "name": "Health Live Probe",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "live"]
+            }
+          }
+        },
+        {
+          "name": "Health Ready Probe",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "ready"]
+            }
+          }
+        },
+        {
+          "name": "Métricas Prometheus",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["metrics"]
+            }
+          }
+        },
+        {
+          "name": "Métricas Snapshot JSON",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics/json",
+              "host": ["{{baseUrl}}"],
+              "path": ["metrics", "json"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

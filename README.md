@@ -28,8 +28,6 @@ infra/
     └── casdoor/               # Volume mapeado do banco SQLite (WAL) do Casdoor IAM
 ```
 
-> **Nota sobre Storage**: O domínio deste desafio utiliza exclusivamente **PostgreSQL** (transacional), **AWS SQS** (mensageria) e **Casdoor** (identidade), não exigindo Object Storage (como S3/RustFS). Todos os volumes persistentes de banco de dados, mensageria e identidade estão mapeados para subdiretórios dentro de `infra/data/`.
-
 Os comandos abaixo rodam na **raiz do repositório**. O `docker-compose.yaml` da raiz inclui `infra/docker-compose.yaml`. O mesmo efeito sai de `docker compose -f infra/docker-compose.yaml ...`.
 
 ### Pré-requisitos
@@ -61,6 +59,7 @@ Os serviços ficam expostos em:
 - **Instância 1 (`app-1`)**: `http://localhost:3000`
 - **Instância 2 (`app-2`)**: `http://localhost:3001`
 - **Instância 3 (`app-3`)**: `http://localhost:3002`
+- **Swagger UI (Documentação Interativa OpenAPI)**: [`http://localhost:3000/docs`](http://localhost:3000/docs) (ou nas portas 3001 e 3002)
 - **Casdoor IAM / OIDC (Web UI & OAuth2 Server)**: `http://localhost:8000` (admin: `admin` / `123`)
 - **PostgreSQL**: `localhost:5432`
 - **LocalStack (SQS)**: `http://localhost:4566`
@@ -477,11 +476,38 @@ bun run typecheck
 
 ---
 
-## 6. Endpoints da API HTTP
+## 6. Documentação Swagger (OpenAPI) e Coleções Postman / Insomnia
 
-> **Nota**: Quando `AUTH_MODE=noop` (padrão), o header `Authorization` é opcional. Quando `AUTH_MODE=casdoor` (ou `strict`), inclua `-H "Authorization: Bearer $TOKEN_PROVIDER_A"` nas chamadas abaixo (veja a Seção 2.4).
+A API conta com documentação interativa completa baseada na especificação **OpenAPI 3.0 / Swagger** e arquivos prontos para testes manuais.
 
-### 5.1 Criar Wallet
+### 6.1 Swagger UI Interativo
+Com a stack Docker ou processo local em execução, acesse pelo navegador:
+👉 **[`http://localhost:3000/docs`](http://localhost:3000/docs)** (ou nas instâncias `http://localhost:3001/docs` e `http://localhost:3002/docs`)
+
+* **Documentação Viva**: Descreve esquemas de requisição, cabeçalhos obrigatórios (`Idempotency-Key`), parâmetros e códigos de resposta (`200`, `201`, `202`, `400`, `401`, `403`, `409`, `422`).
+* **Botão Authorize**: Permite colar o Bearer token JWT emitido pelo Casdoor e executar chamadas autenticadas diretamente pela interface.
+* **Especificação OpenAPI JSON**: Disponível em [`openapi.json`](./openapi.json) na raiz do projeto ou via HTTP em `http://localhost:3000/docs-json`.
+
+### 6.2 Coleção Postman & Insomnia (`postman_collection.json`)
+Disponibilizamos a collection [`postman_collection.json`](./postman_collection.json) na raiz do repositório, pronta para ser importada diretamente no **Postman** ou **Insomnia**:
+
+1. **Como importar no Postman**:
+   - Abra o Postman > clique em **Import** (canto superior esquerdo) > selecione o arquivo [`postman_collection.json`](./postman_collection.json).
+2. **Como importar no Insomnia**:
+   - Abra o Insomnia > clique no botão de configurações / workspace > **Import** > selecione [`postman_collection.json`](./postman_collection.json).
+3. **Pastas e Requisições Pré-configuradas**:
+   - **`0. Autenticação (Casdoor)`**: Chamadas prontas para obter tokens OAuth2 de `provider-a` e `provider-b` via `client_credentials`.
+   - **`1. Wallets & Ledger`**: Criar carteira, consultar saldo, consultar lançamentos paginados do ledger e reconciliação contábil.
+   - **`2. Wagering Transactions`**: Submeter `BET`, `WIN`, `LOSS`, `REFUND` (com geração automática de headers e idempotency key dinâmica) e consultas de transação.
+   - **`3. Observabilidade & Health`**: Probes de liveness/readiness e métricas Prometheus/JSON.
+
+---
+
+## 7. Endpoints da API HTTP (Exemplos cURL)
+
+> **Nota**: Quando `AUTH_MODE=noop` (padrão), o header `Authorization` é opcional. Quando `AUTH_MODE=casdoor` (ou `strict`), inclua `-H "Authorization: Bearer $TOKEN_PROVIDER_A"` nas chamadas abaixo (veja a Seção 3.4).
+
+### 7.1 Criar Wallet
 ```bash
 curl -X POST http://localhost:3000/wallets \
   -H "Content-Type: application/json" \
@@ -491,7 +517,7 @@ curl -X POST http://localhost:3000/wallets \
   }'
 ```
 
-### 5.2 Submeter Transação de Aposta (`BET`, `WIN`, `LOSS`, `REFUND`, `ROLLBACK`)
+### 7.2 Submeter Transação de Aposta (`BET`, `WIN`, `LOSS`, `REFUND`, `ROLLBACK`)
 ```bash
 curl -X POST http://localhost:3000/wagering/transactions \
   -H "Content-Type: application/json" \
@@ -508,7 +534,7 @@ curl -X POST http://localhost:3000/wagering/transactions \
   }'
 ```
 
-### 5.3 Consultas e Reconciliação
+### 7.3 Consultas e Reconciliação
 ```bash
 # Consultar saldo e versão da wallet
 curl http://localhost:3000/wallets/<WALLET_ID>
@@ -526,7 +552,7 @@ curl http://localhost:3000/providers/provider-a/wagering/transactions/transactio
 curl -X POST http://localhost:3000/wallets/<WALLET_ID>/reconciliation
 ```
 
-### 5.4 Observabilidade e Health Checks
+### 7.4 Observabilidade e Health Checks
 ```bash
 # Liveness probe (não requer autenticação)
 curl http://localhost:3000/health/live

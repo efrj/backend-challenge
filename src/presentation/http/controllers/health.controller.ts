@@ -6,9 +6,11 @@ import {
   Inject,
   Res,
 } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { SqsService } from "../../../infrastructure/messaging/sqs.service";
 
+@ApiTags("Observability")
 @Controller("health")
 export class HealthController {
   constructor(
@@ -17,6 +19,8 @@ export class HealthController {
   ) {}
 
   @Get("live")
+  @ApiOperation({ summary: "Liveness probe: indica se o processo está ativo" })
+  @ApiResponse({ status: 200, description: "Processo saudável" })
   live() {
     return {
       status: "ok",
@@ -25,6 +29,9 @@ export class HealthController {
   }
 
   @Get("ready")
+  @ApiOperation({ summary: "Readiness probe: valida conectividade com PostgreSQL e SQS" })
+  @ApiResponse({ status: 200, description: "Todos os serviços dependentes acessíveis" })
+  @ApiResponse({ status: 503, description: "PostgreSQL ou SQS indisponíveis" })
   async ready(@Res() res: Response) {
     let postgresReachable = false;
     try {

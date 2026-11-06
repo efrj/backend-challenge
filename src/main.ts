@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { getAppConfig } from "./infrastructure/config/app-config";
 import { StructuredLoggerService } from "./infrastructure/observability/structured-logger.service";
@@ -17,6 +18,34 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle("Distributed Wagering Processor API")
+    .setDescription(
+      "Serviço financeiro distribuído de processamento de apostas para provedores de jogos iGaming. Suporta BET, WIN, LOSS, REFUND, ROLLBACK, ledger imutável e reconciliação contábil.",
+    )
+    .setVersion("1.0.0")
+    .addBearerAuth(
+      {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Token JWT emitido pelo Casdoor (OIDC / OAuth2 RS256)",
+      },
+      "BearerAuth",
+    )
+    .addTag("Wallets", "Gerenciamento de carteiras de jogadores e ledger imutável")
+    .addTag("Wagering", "Processamento e consultas de transações de apostas")
+    .addTag("Observability", "Probes de healthcheck e métricas")
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup("docs", app, document, {
+    customSiteTitle: "Wagering Processor API Docs",
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
+
   const logger = app.get(StructuredLoggerService);
   const config = getAppConfig();
 
@@ -24,6 +53,7 @@ async function bootstrap() {
   logger.info("Distributed Wagering Processor listening", {
     port: config.port,
     instanceId: config.instanceId,
+    docsUrl: `http://localhost:${config.port}/docs`,
   });
 
   const handleSignal = async (signal: string) => {

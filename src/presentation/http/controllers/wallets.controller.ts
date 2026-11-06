@@ -11,6 +11,15 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 import { randomUUID } from "crypto";
 import { CreateWalletUseCase } from "../../../application/use-cases/create-wallet.use-case";
 import { GetWalletLedgerUseCase } from "../../../application/use-cases/get-wallet-ledger.use-case";
@@ -23,6 +32,8 @@ import { ProviderAuthGuard } from "../../../infrastructure/auth/auth.guard";
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+@ApiTags("Wallets")
+@ApiBearerAuth("BearerAuth")
 @Controller("wallets")
 @UseGuards(ProviderAuthGuard)
 export class WalletsController {
@@ -39,6 +50,19 @@ export class WalletsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: "Criar carteira para jogador com saldo inicial",
+    description:
+      "Cria a carteira e gera atomicamente o lançamento inicial de crédito no ledger.",
+  })
+  @ApiHeader({
+    name: "x-correlation-id",
+    required: false,
+    description: "Identificador de rastreamento distribuído",
+  })
+  @ApiResponse({ status: 201, description: "Carteira criada com sucesso" })
+  @ApiResponse({ status: 400, description: "Dados de entrada inválidos" })
+  @ApiResponse({ status: 409, description: "Jogador já possui carteira nesta moeda" })
   async createWallet(
     @Body()
     body: {
@@ -65,6 +89,10 @@ export class WalletsController {
   }
 
   @Get(":walletId")
+  @ApiOperation({ summary: "Consultar carteira e saldo materializado" })
+  @ApiParam({ name: "walletId", description: "UUID da carteira" })
+  @ApiResponse({ status: 200, description: "Dados da carteira" })
+  @ApiResponse({ status: 404, description: "Carteira não encontrada" })
   async getWallet(@Param("walletId") walletId: string) {
     if (!UUID_REGEX.test(walletId)) {
       throw new InvalidWalletStateError("walletId must be a valid UUID");
@@ -73,6 +101,15 @@ export class WalletsController {
   }
 
   @Get(":walletId/ledger")
+  @ApiOperation({
+    summary: "Consultar extrato contábil imutável (Ledger)",
+    description: "Paginação via cursor opaco e estável.",
+  })
+  @ApiParam({ name: "walletId", description: "UUID da carteira" })
+  @ApiQuery({ name: "limit", required: false, description: "Quantidade máxima de registros (default: 50)" })
+  @ApiQuery({ name: "cursor", required: false, description: "Cursor de paginação retornado no nextCursor anterior" })
+  @ApiResponse({ status: 200, description: "Página de lançamentos do ledger" })
+  @ApiResponse({ status: 404, description: "Carteira não encontrada" })
   async getWalletLedger(
     @Param("walletId") walletId: string,
     @Query("cursor") cursor?: string,
@@ -95,6 +132,14 @@ export class WalletsController {
 
   @Post(":walletId/reconciliation")
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Executar reconciliação contábil da carteira",
+    description:
+      "Calcula em tempo real a soma dos lançamentos do ledger com row lock e compara com o saldo persistido, reportando discrepâncias.",
+  })
+  @ApiParam({ name: "walletId", description: "UUID da carteira" })
+  @ApiResponse({ status: 200, description: "Resultado da reconciliação contábil" })
+  @ApiResponse({ status: 404, description: "Carteira não encontrada" })
   async reconcileWallet(
     @Param("walletId") walletId: string,
     @Headers("x-correlation-id") correlationId?: string,
