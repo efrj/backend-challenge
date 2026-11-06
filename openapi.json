@@ -367,7 +367,7 @@
   },
   "info": {
     "title": "Distributed Wagering Processor API",
-    "description": "Serviço financeiro distribuído de processamento de apostas para provedores de jogos iGaming.",
+    "description": "## Visão Geral\nServiço financeiro distribuído de processamento de transações de apostas (BET, WIN, LOSS, REFUND, ROLLBACK) para múltiplos provedores de jogos iGaming.\n\n---\n\n## 🔐 Autenticação e Autorização (Casdoor OIDC / OAuth2)\nO gerenciamento de identidade é realizado pelo Casdoor (casbin/casdoor), escolhido como herdeiro/substituto direto do Keycloak por ser drasticamente mais leve.\n\n### Como autenticar no Swagger:\n1. Emita um token JWT assinado (RS256) no endpoint OAuth2 do Casdoor:\ncurl -s -X POST http://localhost:8000/api/login/oauth/access_token \\\n  -H \"Content-Type: application/x-www-form-urlencoded\" \\\n  -d \"grant_type=client_credentials\" \\\n  -d \"client_id=provider-a-client-id\" \\\n  -d \"client_secret=provider-a-client-secret\" \\\n  -d \"scope=openid profile wagering:write wagering:read\" | jq -r .access_token\n\n2. Clique no botão verde Authorize e cole o token.",
     "version": "1.0.0",
     "contact": {}
   },
