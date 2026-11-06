@@ -4,6 +4,8 @@ import {
   WagerTransactionStatus,
 } from "../../domain/wagering/wager-transaction";
 import {
+  recordOtelAuthAttempt,
+  recordOtelAuthForbidden,
   recordOtelDlq,
   recordOtelDuplicate,
   recordOtelIdempotencyConflict,
@@ -34,6 +36,13 @@ export interface MetricsSnapshot {
   dlqMessages: number;
   lockConflicts: number;
   reconciliationDiscrepancies: number;
+  authAttempts: {
+    authenticated: number;
+    unauthorized: number;
+    anonymous: number;
+    total: number;
+  };
+  authForbiddenAttempts: number;
   outboxLagSeconds: number;
   outboxPendingCount: number;
   processingLatencyMs: {
@@ -61,6 +70,10 @@ export class MetricsService {
   private dlqMessages = 0;
   private lockConflicts = 0;
   private reconciliationDiscrepancies = 0;
+  private authAuthenticated = 0;
+  private authUnauthorized = 0;
+  private authAnonymous = 0;
+  private authForbiddenAttempts = 0;
   private outboxLagSeconds = 0;
   private outboxPendingCount = 0;
   private readonly latenciesMs: number[] = [];
@@ -138,6 +151,22 @@ export class MetricsService {
     recordOtelReconciliationDiscrepancy();
   }
 
+  recordAuthAttempt(status: "authenticated" | "unauthorized" | "anonymous"): void {
+    if (status === "authenticated") {
+      this.authAuthenticated += 1;
+    } else if (status === "unauthorized") {
+      this.authUnauthorized += 1;
+    } else {
+      this.authAnonymous += 1;
+    }
+    recordOtelAuthAttempt(status);
+  }
+
+  recordAuthForbidden(providerId?: string, targetProviderId?: string): void {
+    this.authForbiddenAttempts += 1;
+    recordOtelAuthForbidden(providerId, targetProviderId);
+  }
+
   updateOutboxLag(lagSeconds: number, pendingCount: number): void {
     this.outboxLagSeconds = Math.max(0, Number(lagSeconds.toFixed(3)));
     this.outboxPendingCount = Math.max(0, pendingCount);
@@ -199,6 +228,16 @@ export class MetricsService {
       dlqMessages: this.dlqMessages,
       lockConflicts: this.lockConflicts,
       reconciliationDiscrepancies: this.reconciliationDiscrepancies,
+      authAttempts: {
+        authenticated: this.authAuthenticated,
+        unauthorized: this.authUnauthorized,
+        anonymous: this.authAnonymous,
+        total:
+          this.authAuthenticated +
+          this.authUnauthorized +
+          this.authAnonymous,
+      },
+      authForbiddenAttempts: this.authForbiddenAttempts,
       outboxLagSeconds: this.outboxLagSeconds,
       outboxPendingCount: this.outboxPendingCount,
       processingLatencyMs: {
@@ -258,6 +297,24 @@ export class MetricsService {
     lines.push("# TYPE wager_reconciliation_discrepancies_total counter");
     lines.push(
       `wager_reconciliation_discrepancies_total ${snap.reconciliationDiscrepancies}`,
+    );
+
+    lines.push("# HELP wager_auth_attempts_total Total authentication attempts by status");
+    lines.push("# TYPE wager_auth_attempts_total counter");
+    lines.push(
+      `wager_auth_attempts_total{status="authenticated"} ${snap.authAttempts.authenticated}`,
+    );
+    lines.push(
+      `wager_auth_attempts_total{status="unauthorized"} ${snap.authAttempts.unauthorized}`,
+    );
+    lines.push(
+      `wager_auth_attempts_total{status="anonymous"} ${snap.authAttempts.anonymous}`,
+    );
+
+    lines.push("# HELP wager_auth_forbidden_total Forbidden authorization attempts (cross-provider/tenant violation)");
+    lines.push("# TYPE wager_auth_forbidden_total counter");
+    lines.push(
+      `wager_auth_forbidden_total ${snap.authForbiddenAttempts}`,
     );
 
     lines.push("# HELP wager_outbox_lag_seconds Age in seconds of oldest unpublished outbox message");

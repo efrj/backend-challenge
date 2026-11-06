@@ -34,6 +34,8 @@ interface Instruments {
   lockConflicts: Counter;
   idempotencyConflicts: Counter;
   reconciliationDiscrepancies: Counter;
+  authAttempts: Counter;
+  authForbidden: Counter;
   latency: Histogram;
 }
 
@@ -179,6 +181,17 @@ export function recordOtelReconciliationDiscrepancy(): void {
   instruments?.reconciliationDiscrepancies.add(1);
 }
 
+export function recordOtelAuthAttempt(status: "authenticated" | "unauthorized" | "anonymous"): void {
+  instruments?.authAttempts.add(1, { status });
+}
+
+export function recordOtelAuthForbidden(providerId?: string, targetProviderId?: string): void {
+  instruments?.authForbidden.add(1, {
+    caller_provider: providerId ?? "unknown",
+    target_provider: targetProviderId ?? "unknown",
+  });
+}
+
 export function recordOtelLatency(durationMs: number): void {
   instruments?.latency.record(durationMs);
 }
@@ -213,6 +226,12 @@ function createInstruments(provider: MeterProvider): Instruments {
     "otel.wager.reconciliation_discrepancies",
     { description: "Wallets whose stored balance disagrees with the ledger" },
   );
+  const authAttempts = meter.createCounter("otel.wager.auth_attempts", {
+    description: "Authentication outcomes (authenticated, unauthorized, anonymous)",
+  });
+  const authForbidden = meter.createCounter("otel.wager.auth_forbidden", {
+    description: "Forbidden authorization attempts (cross-provider/tenant violation)",
+  });
   const latency = meter.createHistogram("otel.wager.processing_duration", {
     description: "Wager processing latency",
     unit: "ms",
@@ -242,6 +261,8 @@ function createInstruments(provider: MeterProvider): Instruments {
     lockConflicts,
     idempotencyConflicts,
     reconciliationDiscrepancies,
+    authAttempts,
+    authForbidden,
     latency,
   };
 }

@@ -174,6 +174,17 @@ O domínio permanece 100% desacoplado de bibliotecas de JWT ou do Casdoor atrav�
    - **Isolamento Estrito por Provedor (`403 Forbidden`)**: No `ProviderAuthGuard`, se o chamador autenticado estiver vinculado a um provedor específico (ex.: `caller.providerId === "provider-a"`) e tentar enviar uma transação com `body.providerId === "provider-b"` ou consultar `/providers/provider-b/wagering/transactions/:extId`, a requisição é negada imediatamente com `403 Forbidden` antes de tocar na camada de aplicação ou no banco de dados.
    - Os endpoints de infraestrutura (`/health/live`, `/health/ready`, `/metrics` e `/metrics/json`) permanecem isentos do guard para permitir probes de orquestração e scraping do Prometheus.
 
+### 7.3 Observabilidade Integrada à Autenticação
+A autenticação e autorização foram conectadas aos três pilares de observabilidade do sistema:
+1. **Métricas Prometheus & OpenTelemetry**:
+   - `wager_auth_attempts_total{status="authenticated|unauthorized|anonymous"}`: contadores de chamadas por resultado de autenticação.
+   - `wager_auth_forbidden_total{caller_provider, target_provider}`: métrica de segurança registrando violações de tenant/cross-provider.
+   - Painéis dedicados provisionados no dashboard do Grafana (`infra/grafana/provisioning/dashboards/json/wagering.json`).
+2. **Distributed Tracing (Tempo)**:
+   - Spans HTTP gerados pelo `TracingInterceptor` carregam os atributos de identidade: `caller.authenticated`, `caller.subject`, `caller.provider_id` e `caller.client_id`, permitindo auditoria visual direta no Tempo ao investigar traces de requisições.
+3. **Logs Estruturados**:
+   - Logs de alerta gerados no `StructuredLoggerService` para falhas de autenticação e tentativas de violação de tenant, já correlacionados com `traceId` e `correlationId`.
+
 ---
 
 ## 8. Experimento de Teste de Carga (`bun run test:load`)

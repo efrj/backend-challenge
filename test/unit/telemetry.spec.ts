@@ -28,6 +28,9 @@ describe("OpenTelemetry wiring", () => {
     metrics.recordLockConflict();
     metrics.updateOutboxLag(1.5, 2);
     metrics.recordProcessingLatency(12);
+    metrics.recordAuthAttempt("authenticated");
+    metrics.recordAuthAttempt("unauthorized");
+    metrics.recordAuthForbidden("provider-a", "provider-b");
 
     const text = metrics.toPrometheusText();
     expect(text).toContain('wager_transactions_total{status="PROCESSED"} 1');
@@ -37,5 +40,8 @@ describe("OpenTelemetry wiring", () => {
     expect(text).toContain("wager_lock_conflicts_total 1");
     expect(text).toContain("wager_outbox_lag_seconds 1.5");
     expect(text).toContain("wager_outbox_pending_count 2");
+    expect(text).toContain('wager_auth_attempts_total{status="authenticated"} 1');
+    expect(text).toContain('wager_auth_attempts_total{status="unauthorized"} 1');
+    expect(text).toContain("wager_auth_forbidden_total 1");
   });
 });

@@ -6,12 +6,14 @@ import {
 } from "@nestjs/common";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import { Observable, Subscription } from "rxjs";
+import type { AuthenticatedCaller } from "../../../domain/ports/provider-identity.port";
 import { isTelemetryStarted } from "../../../infrastructure/observability/telemetry";
 
 interface HttpRequestLike {
   method?: string;
   url?: string;
   headers?: Record<string, string | string[] | undefined>;
+  caller?: AuthenticatedCaller;
 }
 
 interface HttpResponseLike {
@@ -55,6 +57,16 @@ export class TracingInterceptor implements NestInterceptor {
               "error.type",
               err instanceof Error ? err.name : "Error",
             );
+            if (req.caller) {
+              span.setAttribute("caller.authenticated", req.caller.authenticated);
+              span.setAttribute("caller.subject", req.caller.subject);
+              if (req.caller.providerId) {
+                span.setAttribute("caller.provider_id", req.caller.providerId);
+              }
+              if (req.caller.clientId) {
+                span.setAttribute("caller.client_id", req.caller.clientId);
+              }
+            }
             span.setStatus({ code: SpanStatusCode.ERROR });
             span.end();
             subscriber.error(err);
@@ -65,6 +77,16 @@ export class TracingInterceptor implements NestInterceptor {
               .getResponse<HttpResponseLike>().statusCode;
             if (typeof statusCode === "number") {
               span.setAttribute("http.response.status_code", statusCode);
+            }
+            if (req.caller) {
+              span.setAttribute("caller.authenticated", req.caller.authenticated);
+              span.setAttribute("caller.subject", req.caller.subject);
+              if (req.caller.providerId) {
+                span.setAttribute("caller.provider_id", req.caller.providerId);
+              }
+              if (req.caller.clientId) {
+                span.setAttribute("caller.client_id", req.caller.clientId);
+              }
             }
             span.setStatus({ code: SpanStatusCode.OK });
             span.end();

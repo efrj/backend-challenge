@@ -159,13 +159,43 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }
     },
     {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Autenticação por status (OAuth2 / Casdoor)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (wager_auth_attempts_total{job=\"wagering-processor\"})",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Violações de Tenant / Cross-Provider (403)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(wager_auth_forbidden_total{job=\"wagering-processor\"})",
+          "legendFormat": "Tentativas 403 Bloqueadas"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
       "id": 11,
       "type": "text",
       "title": "Traces",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 20 },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 28 },
       "options": {
         "mode": "markdown",
-        "content": "Os painéis leem `/metrics` das três instâncias (`job=wagering-processor`). Traces HTTP, SQS e outbox vão por OTLP até o Tempo. Abra **Explore**, escolha o datasource **Tempo** e busque pelo `traceId` que aparece nos logs JSON."
+        "content": "Os painéis leem `/metrics` das três instâncias (`job=wagering-processor`). Traces HTTP, SQS e outbox vão por OTLP até o Tempo, incluindo atributos de autenticação (`caller.provider_id`, `caller.subject`, `caller.authenticated`). Abra **Explore**, escolha o datasource **Tempo** e busque pelo `traceId` que aparece nos logs JSON."
       }
     }
   ]

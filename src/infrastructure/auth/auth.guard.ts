@@ -20,6 +20,8 @@ import {
   type ProviderIdentityPort,
 } from "../../domain/ports/provider-identity.port";
 import { getAppConfig } from "../config/app-config";
+import { MetricsService } from "../observability/metrics.service";
+import { StructuredLoggerService } from "../observability/structured-logger.service";
 
 export const CUSTOM_JWKS_RESOLVER = Symbol("CUSTOM_JWKS_RESOLVER");
 
@@ -51,6 +53,12 @@ export class ConfigurableProviderIdentityAdapter implements ProviderIdentityPort
     @Optional()
     @Inject(CUSTOM_JWKS_RESOLVER)
     private readonly customJwks?: JWTVerifyGetKey,
+    @Optional()
+    @Inject(MetricsService)
+    private readonly metrics?: MetricsService,
+    @Optional()
+    @Inject(StructuredLoggerService)
+    private readonly logger?: StructuredLoggerService,
   ) {}
 
   async verifyCaller(
@@ -62,6 +70,7 @@ export class ConfigurableProviderIdentityAdapter implements ProviderIdentityPort
     const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
 
     if (authMode === "noop" && !authHeader) {
+      this.metrics?.recordAuthAttempt("anonymous");
       return {
         subject: "anonymous-trusted-caller",
         scopes: DEFAULT_SCOPES,
@@ -71,8 +80,13 @@ export class ConfigurableProviderIdentityAdapter implements ProviderIdentityPort
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       if (authMode === "casdoor" || authMode === "strict") {
+        this.metrics?.recordAuthAttempt("unauthorized");
+        this.logger?.warn("Authentication rejected: Missing or invalid Bearer token", {
+          authMode,
+        });
         throw new UnauthorizedException("Missing or invalid Bearer token");
       }
+      this.metrics?.recordAuthAttempt("anonymous");
       return {
         subject: "anonymous-trusted-caller",
         scopes: DEFAULT_SCOPES,
@@ -83,8 +97,13 @@ export class ConfigurableProviderIdentityAdapter implements ProviderIdentityPort
     const token = authHeader.slice("Bearer ".length).trim();
     if (!token) {
       if (authMode === "casdoor" || authMode === "strict") {
+        this.metrics?.recordAuthAttempt("unauthorized");
+        this.logger?.warn("Authentication rejected: Empty Bearer token", {
+          authMode,
+        });
         throw new UnauthorizedException("Empty Bearer token");
       }
+      this.metrics?.recordAuthAttempt("anonymous");
       return {
         subject: "anonymous-trusted-caller",
         scopes: DEFAULT_SCOPES,
@@ -93,10 +112,23 @@ export class ConfigurableProviderIdentityAdapter implements ProviderIdentityPort
     }
 
     if (authMode === "casdoor" || authMode === "strict") {
-      return await this.verifyWithCasdoorJwks(token, config.casdoor);
+      try {
+        const caller = await this.verifyWithCasdoorJwks(token, config.casdoor);
+        this.metrics?.recordAuthAttempt("authenticated");
+        return caller;
+      } catch (err) {
+        this.metrics?.recordAuthAttempt("unauthorized");
+        this.logger?.warn("Authentication rejected: Casdoor JWT verification failed", {
+          authMode,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
     }
 
-    return this.decodeUnverifiedTokenForNoop(token);
+    const caller = this.decodeUnverifiedTokenForNoop(token);
+    this.metrics?.recordAuthAttempt("authenticated");
+    return caller;
   }
 
   private async verifyWithCasdoorJwks(
@@ -251,6 +283,12 @@ export class ProviderAuthGuard implements CanActivate {
   constructor(
     @Inject(PROVIDER_IDENTITY_PORT)
     private readonly identityPort: ProviderIdentityPort,
+    @Optional()
+    @Inject(MetricsService)
+    private readonly metrics?: MetricsService,
+    @Optional()
+    @Inject(StructuredLoggerService)
+    private readonly logger?: StructuredLoggerService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -273,6 +311,12 @@ export class ProviderAuthGuard implements CanActivate {
           : undefined;
 
       if (bodyProviderId && bodyProviderId !== caller.providerId) {
+        this.metrics?.recordAuthForbidden(caller.providerId, bodyProviderId);
+        this.logger?.warn("Cross-provider access denied (body mismatch)", {
+          callerProviderId: caller.providerId,
+          targetProviderId: bodyProviderId,
+          subject: caller.subject,
+        });
         throw new ForbiddenException(
           `Authenticated provider '${caller.providerId}' is not authorized to submit transactions for provider '${bodyProviderId}'`,
         );
@@ -285,6 +329,12 @@ export class ProviderAuthGuard implements CanActivate {
           : undefined;
 
       if (paramProviderId && paramProviderId !== caller.providerId) {
+        this.metrics?.recordAuthForbidden(caller.providerId, paramProviderId);
+        this.logger?.warn("Cross-provider access denied (param mismatch)", {
+          callerProviderId: caller.providerId,
+          targetProviderId: paramProviderId,
+          subject: caller.subject,
+        });
         throw new ForbiddenException(
           `Authenticated provider '${caller.providerId}' is not authorized to access resources of provider '${paramProviderId}'`,
         );

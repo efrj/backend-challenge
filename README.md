@@ -109,7 +109,7 @@ curl http://localhost:3002/health/ready
 
 A stack sobe o OpenTelemetry Collector, o Tempo, o Prometheus e o Grafana junto com as três APIs. Cada instância exporta traces e métricas em OTLP para `http://otel-collector:4318` (`OTEL_ENABLED=true` só dentro do Compose). Fora do Docker o export fica desligado, a menos que `OTEL_ENABLED=true` no `.env`.
 
-O dashboard em `http://localhost:3003` lê o `/metrics` das três instâncias: transações por status, duplicatas, retries, latência p95, DLQ, conflitos de lock, conflitos de idempotência, divergências de reconciliação e outbox lag. Os traces (HTTP, consumo SQS e publicação da outbox) ficam no datasource **Tempo**. O `traceId` sai no log JSON da requisição.
+O dashboard em `http://localhost:3003` lê o `/metrics` das três instâncias: transações por status, duplicatas, retries, latência p95, DLQ, conflitos de lock, conflitos de idempotência, divergências de reconciliação, outbox lag e **autenticação/autorização (taxa de sucesso vs. 401 unauthorized e tentativas de violação de tenant 403)**. Os traces (HTTP, consumo SQS e publicação da outbox) ficam no datasource **Tempo**, enriquecidos com atributos de identidade (`caller.provider_id`, `caller.client_id`, `caller.subject`, `caller.authenticated`). O `traceId` sai no log JSON da requisição.
 
 ```bash
 docker compose logs -f otel-collector
