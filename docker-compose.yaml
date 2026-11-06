@@ -1,3 +1,5 @@
+name: jungle-wagering-processor
+
 include:
   - infra/docker-compose.yaml
 

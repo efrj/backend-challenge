@@ -21,6 +21,7 @@ import {
 import { MetricsService } from "../../infrastructure/observability/metrics.service";
 import { StructuredLoggerService } from "../../infrastructure/observability/structured-logger.service";
 import { getAppConfig } from "../../infrastructure/config/app-config";
+import { withSpan } from "../../infrastructure/observability/telemetry";
 import { ProcessWagerTransactionUseCase } from "../use-cases/process-wager-transaction.use-case";
 
 export const SQS_WAGER_CONSUMER_NAME = "sqs-wager-transaction-consumer";
@@ -186,7 +187,16 @@ export class SqsWagerConsumerWorker implements OnModuleInit, OnModuleDestroy {
         .update(rawBody, "utf8")
         .digest("hex");
 
-      const result = await this.processWagerUseCase.execute({
+      const result = await withSpan(
+        "sqs.process",
+        {
+          "message.id": messageId,
+          "correlation.id": correlationId,
+          "provider.id": data.providerId,
+          "wallet.id": data.walletId,
+          "wager.kind": data.kind,
+        },
+        () => this.processWagerUseCase.execute({
         idempotencyKey,
         providerId: data.providerId,
         externalTransactionId: data.externalTransactionId,
@@ -203,7 +213,8 @@ export class SqsWagerConsumerWorker implements OnModuleInit, OnModuleDestroy {
           messageId,
           payloadHash: inboxPayloadHash,
         },
-      });
+        }),
+      );
 
       // Hook right after DB commit and BEFORE SQS ack (used in crash recovery test)
       if (this.beforeAckHook && receiptHandle) {

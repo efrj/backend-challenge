@@ -18,6 +18,9 @@ x-app-docker-env: &app-docker-env
   DB_PORT: "5432"
   SQS_ENDPOINT: http://localstack:4566
   WORKERS_ENABLED: "true"
+  OTEL_ENABLED: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_SERVICE_NAME: wagering-processor
 
 services:
   postgres:
@@ -76,6 +79,8 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     environment:
       <<: *app-docker-env
       INSTANCE_ID: app-1
@@ -100,6 +105,8 @@ services:
         condition: service_healthy
       app-1:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     environment:
       <<: *app-docker-env
       INSTANCE_ID: app-2
@@ -119,9 +126,68 @@ services:
         condition: service_healthy
       app-1:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     environment:
       <<: *app-docker-env
       INSTANCE_ID: app-3
       AUTO_MIGRATE: "false"
     ports:
       - "3002:3000"
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    container_name: jungle-wagering-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.128.0
+    container_name: jungle-wagering-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel/collector.yaml"]
+    volumes:
+      - ./otel/collector.yaml:/etc/otel/collector.yaml:ro
+    ports:
+      - "4318:4318"
+    depends_on:
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: jungle-wagering-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - otel-collector
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: jungle-wagering-grafana
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_UID: wagering-processor
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    ports:
+      - "3003:3000"
+    depends_on:
+      - prometheus
+      - tempo

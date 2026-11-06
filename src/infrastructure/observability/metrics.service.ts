@@ -3,6 +3,17 @@ import {
   WagerTransactionKind,
   WagerTransactionStatus,
 } from "../../domain/wagering/wager-transaction";
+import {
+  recordOtelDlq,
+  recordOtelDuplicate,
+  recordOtelIdempotencyConflict,
+  recordOtelLatency,
+  recordOtelLockConflict,
+  recordOtelReconciliationDiscrepancy,
+  recordOtelRetry,
+  recordOtelTransaction,
+  setOtelOutboxLag,
+} from "./telemetry";
 
 export interface MetricsSnapshot {
   transactionsByStatus: Record<string, number>;
@@ -75,6 +86,7 @@ export class MetricsService {
       key,
       (this.transactionsByStatusAndKind.get(key) ?? 0) + 1,
     );
+    recordOtelTransaction(status, kind);
   }
 
   recordDuplicate(source: "http_idempotency" | "sqs_inbox"): void {
@@ -83,10 +95,12 @@ export class MetricsService {
     } else {
       this.sqsInboxDuplicates += 1;
     }
+    recordOtelDuplicate(source);
   }
 
   recordIdempotencyConflict(): void {
     this.idempotencyConflicts += 1;
+    recordOtelIdempotencyConflict();
   }
 
   recordRetry(
@@ -106,23 +120,28 @@ export class MetricsService {
         this.dbLockRetries += 1;
         break;
     }
+    recordOtelRetry(type);
   }
 
   recordDlqMessage(): void {
     this.dlqMessages += 1;
+    recordOtelDlq();
   }
 
   recordLockConflict(): void {
     this.lockConflicts += 1;
+    recordOtelLockConflict();
   }
 
   recordReconciliationDiscrepancy(): void {
     this.reconciliationDiscrepancies += 1;
+    recordOtelReconciliationDiscrepancy();
   }
 
   updateOutboxLag(lagSeconds: number, pendingCount: number): void {
     this.outboxLagSeconds = Math.max(0, Number(lagSeconds.toFixed(3)));
     this.outboxPendingCount = Math.max(0, pendingCount);
+    setOtelOutboxLag(this.outboxLagSeconds, this.outboxPendingCount);
   }
 
   recordProcessingLatency(durationMs: number): void {
@@ -133,6 +152,7 @@ export class MetricsService {
     if (this.latenciesMs.length > 5000) {
       this.latenciesMs.shift();
     }
+    recordOtelLatency(val);
   }
 
   getSnapshot(): MetricsSnapshot {

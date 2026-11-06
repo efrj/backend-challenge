@@ -43,6 +43,12 @@ export interface AppConfig {
     maxReceiveCount: number;
     visibilityTimeoutSec: number;
   };
+  otel: {
+    enabled: boolean;
+    endpoint: string;
+    serviceName: string;
+    exportIntervalMs: number;
+  };
 }
 
 let envFilesLoaded = false;
@@ -120,6 +126,17 @@ export function getAppConfig(): AppConfig {
       maxReceiveCount: requiredInt("SQS_MAX_RECEIVE_COUNT"),
       visibilityTimeoutSec: requiredInt("SQS_VISIBILITY_TIMEOUT_SEC"),
     },
+    otel: {
+      enabled: process.env.OTEL_ENABLED === "true",
+      endpoint: (
+        process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318"
+      ).replace(/\/$/, ""),
+      serviceName: process.env.OTEL_SERVICE_NAME?.trim() || "wagering-processor",
+      exportIntervalMs: positiveInt(
+        process.env.OTEL_EXPORT_INTERVAL_MS,
+        5000,
+      ),
+    },
   };
 }
 
@@ -149,5 +166,12 @@ function requiredInt(name: string): number {
       `Environment variable ${name} must be a number, received '${raw}'`,
     );
   }
+  return parsed;
+}
+
+function positiveInt(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return parsed;
 }

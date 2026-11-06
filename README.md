@@ -56,6 +56,9 @@ As instâncias ficam expostas em:
 - **Instância 3 (`app-3`)**: `http://localhost:3002`
 - **PostgreSQL**: `localhost:5432`
 - **LocalStack (SQS)**: `http://localhost:4566`
+- **Grafana**: `http://localhost:3003` (dashboard; acesso anônimo de leitura, admin `admin` / `admin`)
+- **Prometheus**: `http://localhost:9090`
+- **OTLP HTTP** (collector): `http://localhost:4318`
 
 ### Migrations
 
@@ -92,6 +95,17 @@ curl http://localhost:3002/health/ready
 ```
 
 `/health/live` só confirma que o processo está no ar. `/health/ready` consulta PostgreSQL e SQS e devolve `200` quando os dois estão acessíveis. Nenhum dos dois exige autenticação.
+
+### OpenTelemetry e dashboard
+
+A stack sobe o OpenTelemetry Collector, o Tempo, o Prometheus e o Grafana junto com as três APIs. Cada instância exporta traces e métricas em OTLP para `http://otel-collector:4318` (`OTEL_ENABLED=true` só dentro do Compose). Fora do Docker o export fica desligado, a menos que `OTEL_ENABLED=true` no `.env`.
+
+O dashboard em `http://localhost:3003` lê o `/metrics` das três instâncias: transações por status, duplicatas, retries, latência p95, DLQ, conflitos de lock, conflitos de idempotência, divergências de reconciliação e outbox lag. Os traces (HTTP, consumo SQS e publicação da outbox) ficam no datasource **Tempo**. O `traceId` sai no log JSON da requisição.
+
+```bash
+docker compose logs -f otel-collector
+docker compose logs -f grafana
+```
 
 ### Parar e recriar os containers
 

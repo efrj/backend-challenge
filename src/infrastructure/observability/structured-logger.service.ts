@@ -1,3 +1,4 @@
+import { trace } from "@opentelemetry/api";
 import { Injectable } from "@nestjs/common";
 import { getAppConfig } from "../config/app-config";
 
@@ -53,11 +54,13 @@ export class StructuredLoggerService {
     }
 
     const sanitizedContext = this.sanitize(context);
+    const spanContext = trace.getActiveSpan()?.spanContext();
     const entry = {
       timestamp: new Date().toISOString(),
       level,
       instanceId: this.instanceId,
       message,
+      ...(spanContext ? { traceId: spanContext.traceId, spanId: spanContext.spanId } : {}),
       correlationId: sanitizedContext.correlationId ?? null,
       messageId: sanitizedContext.messageId ?? null,
       transactionId: sanitizedContext.transactionId ?? null,

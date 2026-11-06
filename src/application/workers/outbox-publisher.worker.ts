@@ -8,6 +8,7 @@ import {
 import { OutboxMessage } from "../../domain/messaging/outbox-message";
 import { getAppConfig } from "../../infrastructure/config/app-config";
 import { SqsService } from "../../infrastructure/messaging/sqs.service";
+import { withSpan } from "../../infrastructure/observability/telemetry";
 import { MetricsService } from "../../infrastructure/observability/metrics.service";
 import { StructuredLoggerService } from "../../infrastructure/observability/structured-logger.service";
 import {
@@ -136,11 +137,21 @@ export class OutboxPublisherWorker implements OnModuleInit, OnModuleDestroy {
         const outboxMsg = PersistenceMapper.outboxToDomain(record);
 
         try {
-          if (customPublishFn) {
-            await customPublishFn(outboxMsg);
-          } else {
-            await this.sqsService.publishOutboxEvent(outboxMsg);
-          }
+          await withSpan(
+            "outbox.publish",
+            {
+              "event.id": outboxMsg.id,
+              "event.type": outboxMsg.eventType,
+              "aggregate.id": outboxMsg.aggregateId,
+            },
+            async () => {
+              if (customPublishFn) {
+                await customPublishFn(outboxMsg);
+              } else {
+                await this.sqsService.publishOutboxEvent(outboxMsg);
+              }
+            },
+          );
 
           const publishNow = new Date();
           outboxMsg.markPublished(publishNow);

@@ -3,8 +3,14 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { getAppConfig } from "./infrastructure/config/app-config";
 import { StructuredLoggerService } from "./infrastructure/observability/structured-logger.service";
+import {
+  shutdownTelemetry,
+  startTelemetry,
+} from "./infrastructure/observability/telemetry";
 
 async function bootstrap() {
+  await startTelemetry();
+
   const app = await NestFactory.create(AppModule, {
     logger: false,
   });
@@ -23,6 +29,7 @@ async function bootstrap() {
   const handleSignal = async (signal: string) => {
     logger.info(`Received ${signal}; starting graceful shutdown`, { signal });
     await app.close();
+    await shutdownTelemetry();
     process.exit(0);
   };
 

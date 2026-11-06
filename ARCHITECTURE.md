@@ -20,7 +20,7 @@ src/
 ├── infrastructure/          # Adaptadores concretos (MikroORM PostgreSQL, AWS SQS, Auth, Logs/Métricas)
 │   ├── persistence/         # EntitySchemas desacoplados, PersistenceMapper (.rehydrate), Migrations
 │   ├── messaging/           # SqsService (FIFO, RedrivePolicy, DLQ, VisibilityTimeout)
-│   ├── observability/       # StructuredLoggerService (JSON c/ redaction) e MetricsService (Prometheus/JSON)
+│   ├── observability/       # Logs JSON, /metrics, OpenTelemetry (OTLP traces + métricas)
 │   └── auth/                # ProviderAuthGuard e ConfigurableProviderIdentityAdapter
 └── presentation/            # Controllers HTTP NestJS e GlobalExceptionFilter
 ```
@@ -182,6 +182,8 @@ Executamos um benchmark reproduzível (`test/load/load-test.ts`) contra **3 inst
    - *Trade-off*: Mantém a conexão do pool ocupada durante a transação daquela wallet (~2–5ms), mas elimina abortos em cascata em *hot wallets* e garante justiça na fila de execução.
 2. **Polling de Outbox (`FOR UPDATE SKIP LOCKED`) vs. CDC (Debezium / Logical Replication)**:
    - *Trade-off*: Polling a cada 200ms adiciona um lag médio de ~100–250ms e realiza queries periódicas no PostgreSQL, mas é simples, autocontido e não exige infraestrutura de Kafka Connect.
-3. **Tabela de Ledger Única vs. Particionamento**:
+3. **OpenTelemetry sem auto-instrumentação**:
+   - *Decisão*: o SDK é iniciado à mão (`TracerProvider` + `MeterProvider` + OTLP/HTTP). Auto-instrumentação de HTTP/pg quebra no Bun e envolveria payloads financeiros. Spans cobrem a requisição HTTP, o consumo SQS e a publicação da outbox, sem valor monetário. As métricas de negócio continuam no `/metrics` de cada processo — o Grafana soma as três instâncias. O export OTLP é paralelo e, se o collector cair, o processamento financeiro segue.
+4. **Tabela de Ledger Única vs. Particionamento**:
    - *Limitação*: Em produção com bilhões de lançamentos, `wallet_ledger_entries` e `wager_transactions` deveriam ser particionadas por `created_at` (mensal) ou hash de `wallet_id`, mantendo snapshots periódicos de reconciliação para evitar `SUM()` histórico completo.
 

@@ -1,6 +1,6 @@
 import { MikroOrmModule } from "@mikro-orm/nestjs";
 import { Module } from "@nestjs/common";
-import { APP_FILTER } from "@nestjs/core";
+import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { CreateWalletUseCase } from "./application/use-cases/create-wallet.use-case";
 import { GetWagerTransactionUseCase } from "./application/use-cases/get-wager-transaction.use-case";
 import { GetWalletLedgerUseCase } from "./application/use-cases/get-wallet-ledger.use-case";
@@ -25,6 +25,7 @@ import { MetricsController } from "./presentation/http/controllers/metrics.contr
 import { WageringController } from "./presentation/http/controllers/wagering.controller";
 import { WalletsController } from "./presentation/http/controllers/wallets.controller";
 import { GlobalExceptionFilter } from "./presentation/http/filters/global-exception.filter";
+import { TracingInterceptor } from "./presentation/http/interceptors/tracing.interceptor";
 
 @Module({
   imports: [
@@ -60,6 +61,10 @@ import { GlobalExceptionFilter } from "./presentation/http/filters/global-except
     {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TracingInterceptor,
     },
   ],
   exports: [
