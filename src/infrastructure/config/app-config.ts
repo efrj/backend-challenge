@@ -15,13 +15,19 @@ export interface AppConfig {
   port: number;
   instanceId: string;
   logSilent: boolean;
-  authMode: "noop" | "strict";
+  authMode: "noop" | "casdoor" | "strict";
   autoMigrate: boolean;
   workersEnabled: boolean;
   outboxPollIntervalMs: number;
   pendingRefPollIntervalMs: number;
   pendingRefMaxAttempts: number;
   pendingRefInitialBackoffMs: number;
+  casdoor: {
+    endpoint: string;
+    jwksUrl: string;
+    issuer?: string;
+    audience?: string;
+  };
   db: {
     host: string;
     port: number;
@@ -87,11 +93,24 @@ export function getAppConfig(): AppConfig {
   loadEnvFiles();
 
   const authMode = required("AUTH_MODE");
-  if (authMode !== "noop" && authMode !== "strict") {
+  if (
+    authMode !== "noop" &&
+    authMode !== "casdoor" &&
+    authMode !== "strict"
+  ) {
     throw new Error(
-      `Environment variable AUTH_MODE must be 'noop' or 'strict', received '${authMode}'`,
+      `Environment variable AUTH_MODE must be 'noop', 'casdoor', or 'strict', received '${authMode}'`,
     );
   }
+
+  const casdoorEndpoint = (
+    process.env.CASDOOR_ENDPOINT?.trim() || "http://localhost:8000"
+  ).replace(/\/$/, "");
+  const casdoorJwksUrl =
+    process.env.CASDOOR_JWKS_URL?.trim() ||
+    `${casdoorEndpoint}/.well-known/jwks`;
+  const casdoorIssuer = process.env.CASDOOR_ISSUER?.trim() || undefined;
+  const casdoorAudience = process.env.CASDOOR_AUDIENCE?.trim() || undefined;
 
   return {
     nodeEnv: process.env.NODE_ENV?.trim() || "development",
@@ -105,6 +124,12 @@ export function getAppConfig(): AppConfig {
     pendingRefPollIntervalMs: requiredInt("PENDING_REF_POLL_INTERVAL_MS"),
     pendingRefMaxAttempts: requiredInt("PENDING_REF_MAX_ATTEMPTS"),
     pendingRefInitialBackoffMs: requiredInt("PENDING_REF_INITIAL_BACKOFF_MS"),
+    casdoor: {
+      endpoint: casdoorEndpoint,
+      jwksUrl: casdoorJwksUrl,
+      issuer: casdoorIssuer,
+      audience: casdoorAudience,
+    },
     db: {
       host: required("DB_HOST"),
       port: requiredInt("DB_PORT"),

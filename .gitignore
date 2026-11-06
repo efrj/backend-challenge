@@ -2,9 +2,10 @@ node_modules/
 dist/
 infra/data/postgres/*
 infra/data/localstack/*
+infra/data/casdoor/*
 !infra/data/postgres/.gitkeep
 !infra/data/localstack/.gitkeep
+!infra/data/casdoor/.gitkeep
 .env
 *.log
 .DS_Store
-node_modules

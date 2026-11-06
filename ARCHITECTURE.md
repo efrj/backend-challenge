@@ -149,13 +149,30 @@ Outros códigos HTTP padronizados:
 
 ---
 
-## 7. Autenticação (Seção 2)
+## 7. Autenticação e Autorização OIDC/JWKS com Casdoor (Seção 2)
 
-Conforme permitido pela Seção 2, priorizamos 100% do foco em correção financeira, concorrência, idempotência e resiliência, deixando a porta de autenticação explícita no domínio (`ProviderIdentityPort` em `src/domain/ports/provider-identity.port.ts`) e aplicada nos controllers de negócio via `ProviderAuthGuard` (`src/infrastructure/auth/auth.guard.ts`), mantendo `/health/live` e `/health/ready` abertos.
+### 7.1 Escolha do Casdoor como Substituto Leve do Keycloak
 
-- **Modo padrão (`AUTH_MODE=noop`)**: Permite execução direta dos testes automatizados e chamadas locais sem exigir container extra de IdP.
-- **Modo estrito neste repositório (`AUTH_MODE=strict`)**: exige header `Authorization: Bearer` e lê `sub`, `provider_id` e `scope` do payload do JWT. Não valida assinatura.
-- **Desenho de produção (não implementado neste timebox)**: Keycloak ou Zitadel emitem o access token via `client_credentials`. O mesmo `ProviderIdentityPort` passaria a validar a assinatura no JWKS do IdP e a recusar a chamada quando `caller.providerId` divergir do `providerId` do corpo. Health checks continuam sem guarda.
+Para o gerenciamento de identidade e autenticação M2M (*Machine-to-Machine*) dos provedores de jogos, integramos o **[Casdoor](https://casdoor.org/) (`casbin/casdoor`)** à infraestrutura Docker (`infra/docker-compose.yaml`).
+
+O **Casdoor** foi escolhido especificamente por ser uma espécie de **herdeiro/substituto direto do Keycloak** e por ser **muito mais leve**:
+- **Eficiência de Recursos**: Enquanto o Keycloak roda sobre a JVM (Quarkus) e consome facilmente entre **800 MB e 1.5 GB de RAM** com tempos de inicialização de 30–60 segundos, o Casdoor é escrito em **Go**, consome apenas **~40–60 MB de RAM** e inicializa em **~2 segundos**.
+- **Compatibilidade OIDC/OAuth 2.0 Completa**: Suporta todos os fluxos padrões de mercado (`client_credentials`, `password`, `authorization_code`, `refresh_token`), assinatura assimétrica `RS256` via certificados X.509/RSA gerenciados e descoberta pública de chaves via **JWKS (`/.well-known/jwks`)**.
+- **Provisionamento Zero-Touch (`infra/casdoor/init_data.json`)**: Na subida do container, o Casdoor importa declarativamente a organização `jungle`, o certificado `cert-built-in` (`RS256`), as aplicações OAuth2 (`provider-a` e `provider-b`) e os usuários correspondentes, persistindo o estado em SQLite com modo WAL em `infra/data/casdoor/casdoor.db`.
+
+### 7.2 Arquitetura da Porta `ProviderIdentityPort` e `ProviderAuthGuard`
+
+O domínio permanece 100% desacoplado de bibliotecas de JWT ou do Casdoor através da porta [`ProviderIdentityPort`](./src/domain/ports/provider-identity.port.ts), implementada em infraestrutura por [`ConfigurableProviderIdentityAdapter`](./src/infrastructure/auth/auth.guard.ts) e aplicada aos controllers de negócio (`WalletsController` e `WageringController`) via [`ProviderAuthGuard`](./src/infrastructure/auth/auth.guard.ts):
+
+1. **Modo `AUTH_MODE=noop` (Default para testes rápidos de domínio/carga)**:
+   - Permite chamadas sem header `Authorization` (atribuindo `subject: "anonymous-trusted-caller"` e `authenticated: false`).
+   - Caso um header `Authorization: Bearer <jwt>` seja enviado, decodifica o payload para popular `req.caller`.
+2. **Modo `AUTH_MODE=casdoor` (ou `AUTH_MODE=strict`)**:
+   - Exige `Authorization: Bearer <jwt>` (`401 Unauthorized` se ausente ou malformado).
+   - Valida criptograficamente a assinatura `RS256` e a expiração (`exp`/`nbf`) do JWT usando a biblioteca `jose` (`createRemoteJWKSet` + `jwtVerify`) contra o endpoint JWKS do Casdoor (`CASDOOR_JWKS_URL`), fazendo cache em memória das chaves públicas para não adicionar latência de rede a cada requisição.
+   - Extrai o identificador do provedor (`providerId`) a partir das claims do token emitido pelo Casdoor (`provider_id`, `tag` ou `name` da aplicação/usuário na organização `jungle`, diferenciando-o do administrador global `built-in/admin`).
+   - **Isolamento Estrito por Provedor (`403 Forbidden`)**: No `ProviderAuthGuard`, se o chamador autenticado estiver vinculado a um provedor específico (ex.: `caller.providerId === "provider-a"`) e tentar enviar uma transação com `body.providerId === "provider-b"` ou consultar `/providers/provider-b/wagering/transactions/:extId`, a requisição é negada imediatamente com `403 Forbidden` antes de tocar na camada de aplicação ou no banco de dados.
+   - Os endpoints de infraestrutura (`/health/live`, `/health/ready`, `/metrics` e `/metrics/json`) permanecem isentos do guard para permitir probes de orquestração e scraping do Prometheus.
 
 ---
 

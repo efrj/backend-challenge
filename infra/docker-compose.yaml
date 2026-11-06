@@ -17,6 +17,8 @@ x-app-docker-env: &app-docker-env
   DB_HOST: postgres
   DB_PORT: "5432"
   SQS_ENDPOINT: http://localstack:4566
+  CASDOOR_ENDPOINT: http://casdoor:8000
+  CASDOOR_JWKS_URL: http://casdoor:8000/.well-known/jwks
   WORKERS_ENABLED: "true"
   OTEL_ENABLED: "true"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
@@ -69,6 +71,30 @@ services:
       timeout: 5s
       retries: 20
 
+  casdoor:
+    image: casbin/casdoor:latest
+    container_name: jungle-wagering-casdoor
+    restart: unless-stopped
+    environment:
+      driverName: sqlite3
+      dataSourceName: "file:/data/casdoor.db?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)"
+      dbName: ""
+      httpport: "8000"
+      runmode: prod
+      initAdminPassword: ${CASDOOR_ADMIN_PASSWORD:-123}
+      initDataFile: /init_data.json
+      initDataNewOnly: "true"
+    ports:
+      - "${CASDOOR_PORT:-8000}:8000"
+    volumes:
+      - ./data/casdoor:/data
+      - ./casdoor/init_data.json:/init_data.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/.well-known/jwks >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
   app-1:
     build: *app-build
     container_name: jungle-wagering-app-1
@@ -78,6 +104,8 @@ services:
       postgres:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      casdoor:
         condition: service_healthy
       otel-collector:
         condition: service_started
@@ -103,6 +131,8 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
+      casdoor:
+        condition: service_healthy
       app-1:
         condition: service_healthy
       otel-collector:
@@ -123,6 +153,8 @@ services:
       postgres:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      casdoor:
         condition: service_healthy
       app-1:
         condition: service_healthy

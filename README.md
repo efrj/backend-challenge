@@ -1,8 +1,8 @@
 # Distributed Wagering Processor — Jungle Gaming Technical Challenge
 
-Serviço financeiro distribuído para processamento de transações de apostas (`BET`, `WIN`, `LOSS`, `REFUND`, `ROLLBACK`) de múltiplos provedores de jogos, construído com **Bun 1.x**, **TypeScript (strict mode)**, **NestJS**, **MikroORM**, **PostgreSQL 16** e **AWS SQS (LocalStack)**.
+Serviço financeiro distribuído para processamento de transações de apostas (`BET`, `WIN`, `LOSS`, `REFUND`, `ROLLBACK`) de múltiplos provedores de jogos, construído com **Bun 1.x**, **TypeScript (strict mode)**, **NestJS**, **MikroORM**, **PostgreSQL 16**, **AWS SQS (LocalStack)** e **Casdoor (IAM / OIDC / OAuth2)**.
 
-As decisões arquiteturais, modelagem de domínio, garantias no schema SQL, estratégia de concorrência e resultados do teste de carga estão detalhados em [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+As decisões arquiteturais, modelagem de domínio, garantias no schema SQL, estratégia de concorrência, autenticação OIDC/JWKS com Casdoor e resultados do teste de carga estão detalhados em [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ---
 
@@ -13,15 +13,22 @@ Toda a infraestrutura containerizada reside no diretório [`infra/`](./infra):
 ```
 infra/
 ├── Dockerfile                 # Imagem Bun 1.x da aplicação
-├── docker-compose.yaml        # Orquestração: PostgreSQL 16, LocalStack SQS e 3 instâncias da API (app-1, app-2, app-3)
+├── docker-compose.yaml        # Orquestração: PostgreSQL 16, LocalStack SQS, Casdoor IAM, OTel/Tempo/Prometheus/Grafana e 3 instâncias da API (app-1, app-2, app-3)
+├── casdoor/
+│   └── init_data.json         # Bootstrap declarativo do Casdoor (organização jungle, certificados RS256, aplicações e usuários provider-a e provider-b)
+├── grafana/                   # Provisionamento automático de datasources (Prometheus + Tempo) e dashboard financeiro
+├── otel/                      # Configuração do OpenTelemetry Collector
+├── prometheus/                # Scrape das 3 instâncias da API e do OTel Collector
+├── tempo/                     # Backend de distributed tracing (Grafana Tempo)
 ├── scripts/
 │   └── init-localstack.sh     # Provisionamento automático das filas FIFO e DLQ no LocalStack
 └── data/
     ├── postgres/              # Volume mapeado do banco de dados PostgreSQL
-    └── localstack/            # Volume mapeado de estado/storage do LocalStack
+    ├── localstack/            # Volume mapeado de estado/storage do LocalStack
+    └── casdoor/               # Volume mapeado do banco SQLite (WAL) do Casdoor IAM
 ```
 
-> **Nota sobre Storage**: O domínio deste desafio utiliza exclusivamente **PostgreSQL** (transacional) e **AWS SQS** (mensageria), não exigindo Object Storage (como S3/RustFS). Todos os volumes persistentes de banco de dados e mensageria estão mapeados para subdiretórios dentro de `infra/data/`.
+> **Nota sobre Storage**: O domínio deste desafio utiliza exclusivamente **PostgreSQL** (transacional), **AWS SQS** (mensageria) e **Casdoor** (identidade), não exigindo Object Storage (como S3/RustFS). Todos os volumes persistentes de banco de dados, mensageria e identidade estão mapeados para subdiretórios dentro de `infra/data/`.
 
 Os comandos abaixo rodam na **raiz do repositório**. O `docker-compose.yaml` da raiz inclui `infra/docker-compose.yaml`. O mesmo efeito sai de `docker compose -f infra/docker-compose.yaml ...`.
 
@@ -33,27 +40,28 @@ O Bun só entra se a API ou os testes forem executados no host. A stack completa
 
 ### Configuração
 
-As variáveis ficam em [`.env.example`](./.env.example). O Compose carrega esse arquivo nos containers da API e, se existir, também o `.env` da raiz (este último prevalece). Dentro da rede, só estes valores mudam em relação ao exemplo: `DB_HOST=postgres`, `SQS_ENDPOINT=http://localstack:4566`, `INSTANCE_ID` e `AUTO_MIGRATE`.
+As variáveis ficam em [`.env.example`](./.env.example). O Compose carrega esse arquivo nos containers da API e, se existir, também o `.env` da raiz (este último prevalece). Dentro da rede, só estes valores mudam em relação ao exemplo: `DB_HOST=postgres`, `SQS_ENDPOINT=http://localstack:4566`, `CASDOOR_ENDPOINT=http://casdoor:8000`, `CASDOOR_JWKS_URL=http://casdoor:8000/.well-known/jwks`, `INSTANCE_ID` e `AUTO_MIGRATE`.
 
 ```bash
 cp .env.example .env   # opcional; sem este arquivo os defaults do exemplo valem
 ```
 
-Postgres e LocalStack recebem usuário, senha, banco e nomes de fila pelas mesmas variáveis. Para trocar algum desses valores, edite o `.env` e recrie os containers.
+Postgres, LocalStack e Casdoor recebem usuário, senha, banco e nomes de fila pelas mesmas variáveis. Para trocar algum desses valores, edite o `.env` e recrie os containers.
 
-### Subindo toda a stack (3 instâncias + Postgres + LocalStack)
+### Subindo toda a stack (3 instâncias + Postgres + LocalStack + Casdoor + Observabilidade)
 
 ```bash
 docker compose up -d --build
 ```
 
-O `--build` gera a imagem Bun das três instâncias. Na primeira subida o Postgres e o LocalStack precisam ficar saudáveis antes das APIs; o Compose já espera esses healthchecks. A `app-2` e a `app-3` só iniciam depois que a `app-1` responde em `/health/ready`.
+O `--build` gera a imagem Bun das três instâncias. Na primeira subida o Postgres, o LocalStack e o Casdoor precisam ficar saudáveis antes das APIs; o Compose já espera esses healthchecks. A `app-2` e a `app-3` só iniciam depois que a `app-1` responde em `/health/ready`.
 
-As instâncias ficam expostas em:
+Os serviços ficam expostos em:
 
 - **Instância 1 (`app-1`)**: `http://localhost:3000`
 - **Instância 2 (`app-2`)**: `http://localhost:3001`
 - **Instância 3 (`app-3`)**: `http://localhost:3002`
+- **Casdoor IAM / OIDC (Web UI & OAuth2 Server)**: `http://localhost:8000` (admin: `admin` / `123`)
 - **PostgreSQL**: `localhost:5432`
 - **LocalStack (SQS)**: `http://localhost:4566`
 - **Grafana**: `http://localhost:3003` (dashboard; acesso anônimo de leitura, admin `admin` / `admin`)
@@ -71,7 +79,7 @@ O comando `bun run migration:up` existe só para o fluxo em que a API roda no ho
 `docker compose up -d` devolve o terminal assim que os containers são criados. A API pode ainda estar subindo. Confira o estado e acompanhe a saída:
 
 ```bash
-# Estado de cada serviço. postgres, localstack e app-1 devem chegar em healthy
+# Estado de cada serviço. postgres, localstack, casdoor e app-1 devem chegar em healthy
 docker compose ps
 
 # Logs de toda a stack, em tempo real
@@ -79,6 +87,7 @@ docker compose logs -f
 
 # Logs de um serviço só
 docker compose logs -f app-1
+docker compose logs -f casdoor
 docker compose logs -f postgres
 docker compose logs -f localstack
 ```
@@ -94,7 +103,7 @@ curl http://localhost:3001/health/ready
 curl http://localhost:3002/health/ready
 ```
 
-`/health/live` só confirma que o processo está no ar. `/health/ready` consulta PostgreSQL e SQS e devolve `200` quando os dois estão acessíveis. Nenhum dos dois exige autenticação.
+`/health/live` só confirma que o processo está no ar. `/health/ready` consulta PostgreSQL e SQS e devolve `200` quando os dois estão acessíveis. Nenhum dos dois exige autenticação (mesmo com `AUTH_MODE=casdoor`).
 
 ### OpenTelemetry e dashboard
 
@@ -126,11 +135,156 @@ docker compose up -d --build
 docker compose up -d --build --force-recreate
 ```
 
-Os dados do Postgres e do LocalStack ficam em `infra/data/postgres` e `infra/data/localstack`. `docker compose down` não apaga esses diretórios. Para zerar o banco e as filas, pare a stack e apague o conteúdo desses diretórios antes de subir de novo.
+Os dados do Postgres, do LocalStack e do Casdoor ficam em `infra/data/postgres`, `infra/data/localstack` e `infra/data/casdoor`. `docker compose down` não apaga esses diretórios. Para zerar o banco, as filas e o estado do IdP, pare a stack e apague o conteúdo desses diretórios antes de subir de novo.
 
 ---
 
-## 2. Desenvolvimento Local e Comandos
+## 2. Autenticação e Autorização com Casdoor (OIDC / OAuth2 + JWKS)
+
+### 2.1 Por que escolhemos o Casdoor?
+
+Para a autenticação e autorização dos provedores de jogos (`provider-a`, `provider-b`, etc.), adotamos o **[Casdoor](https://casdoor.org/) (`casbin/casdoor`)** como servidor de identidade OIDC/OAuth2.
+
+O **Casdoor** foi escolhido por atuar como uma espécie de **herdeiro/substituto direto do Keycloak** e por ser **drasticamente mais leve**:
+
+| Característica | Keycloak (Java / Quarkus) | Casdoor (Go / Casbin) |
+|---|---|---|
+| **Runtime** | JVM (Java) | Binário nativo compilado em **Go** |
+| **Consumo de RAM em container** | ~800 MB a >1.5 GB | **~40 MB a 60 MB** |
+| **Tempo de boot (Cold Start)** | 30s a 60s+ | **~1.5s a 2s** |
+| **Protocolos suportados** | OIDC, OAuth 2.0, SAML, JWKS | **OIDC, OAuth 2.0 (`client_credentials`, `password`, `authorization_code`), SAML, JWKS RS256, Casbin RBAC** |
+| **Provisionamento declarativo** | Realm JSON pesado e lento para importar | **`init_data.json` instantâneo no boot** |
+| **Interface de Administração** | Web Console | **Web UI moderna e completa (`http://localhost:8000`)** |
+
+Isso permite subir um servidor de identidade OIDC/OAuth2 real junto com as 3 instâncias da API, PostgreSQL, LocalStack e toda a stack de observabilidade sem sobrecarregar a máquina de desenvolvimento ou o ambiente de CI.
+
+### 2.2 Credenciais Pré-Provisionadas (`infra/casdoor/init_data.json`)
+
+Na primeira inicialização, o Casdoor carrega automaticamente o arquivo [`infra/casdoor/init_data.json`](./infra/casdoor/init_data.json) e cria a organização `jungle`, o certificado RSA de 2048 bits (`cert-built-in`, algoritmo `RS256`), duas aplicações OAuth2 e os respectivos usuários dos provedores de jogos:
+
+| Entidade | Identificador / Usuário | Segredo / Senha | `providerId` Mapeado no Token |
+|---|---|---|---|
+| **Console Web Admin** (`http://localhost:8000`) | `admin` (org: `built-in`) | `123` | *(Operador global — acesso irrestrito)* |
+| **App OAuth2 — Provider A** (`client_credentials`) | `client_id`: `provider-a-client-id` | `client_secret`: `provider-a-client-secret` | `provider-a` |
+| **App OAuth2 — Provider B** (`client_credentials`) | `client_id`: `provider-b-client-id` | `client_secret`: `provider-b-client-secret` | `provider-b` |
+| **Usuário — Provider A** (`password` grant) | `username`: `provider-a` (org: `jungle`) | `password`: `provider-a-secret` | `provider-a` |
+| **Usuário — Provider B** (`password` grant) | `username`: `provider-b` (org: `jungle`) | `password`: `provider-b-secret` | `provider-b` |
+
+### 2.3 Modos de Operação (`AUTH_MODE`)
+
+A autenticação é controlada pela variável de ambiente `AUTH_MODE` (lida por `getAppConfig()` e aplicada pelo `ProviderAuthGuard` / `ConfigurableProviderIdentityAdapter`):
+
+1. **`AUTH_MODE=noop` (Padrão em `.env.example`)**:
+   - Modo *frictionless* para avaliação rápida e execução imediata de testes de carga/concorrência sem necessidade de anexar tokens em cada chamada.
+   - Se o header `Authorization: Bearer <token>` não for enviado, a requisição é aceita como `anonymous-trusted-caller`. Se um JWT for enviado, suas claims (`sub`, `providerId`, `scope`) são decodificadas e anexadas ao contexto da requisição (`req.caller`).
+2. **`AUTH_MODE=casdoor` (ou `AUTH_MODE=strict`)**:
+   - **Exige** um token JWT válido no header `Authorization: Bearer <token>` em todos os endpoints de `/wallets` e `/wagering/transactions` (retornando `401 Unauthorized` se ausente, expirado ou com assinatura inválida).
+   - **Verifica criptograficamente a assinatura `RS256`** do token diretamente nas chaves públicas expostas pelo endpoint JWKS do Casdoor (`GET http://localhost:8000/.well-known/jwks` no host ou `http://casdoor:8000/.well-known/jwks` na rede Docker), utilizando cache em memória das chaves (`jose`).
+   - **Impõe Isolamento entre Provedores (*Tenant Isolation*)**: um token emitido para `provider-a` **só pode** submeter ou consultar transações cujo `providerId` seja `"provider-a"`. Qualquer tentativa de enviar ou consultar dados de `"provider-b"` com o token do `"provider-a"` é bloqueada imediatamente pelo `ProviderAuthGuard` com **`403 Forbidden`**.
+   - Os endpoints operacionais `/health/live`, `/health/ready` e `/metrics` permanecem abertos para healthchecks do Docker/Kubernetes e coleta do Prometheus.
+
+### 2.4 Passo a Passo: Como Obter um Token no Casdoor e Chamar a API
+
+#### Passo 1: Ativar `AUTH_MODE=casdoor` (opcional se quiser forçar exigência na stack)
+No arquivo `.env` na raiz do projeto, defina:
+```dotenv
+AUTH_MODE=casdoor
+```
+E aplique nos containers da API:
+```bash
+docker compose up -d
+```
+
+#### Passo 2: Obter um Access Token JWT (`RS256`) no Casdoor
+
+Você pode emitir o token via **`client_credentials`** (recomendado para comunicação *machine-to-machine* entre o servidor do provedor de jogo e o Wagering Processor) ou via **`password` grant**:
+
+**Opção A — `client_credentials` Grant (Provider A):**
+```bash
+export TOKEN_PROVIDER_A=$(curl -s -X POST http://localhost:8000/api/login/oauth/access_token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials" \
+  -d "client_id=provider-a-client-id" \
+  -d "client_secret=provider-a-client-secret" \
+  -d "scope=openid profile wagering:write wagering:read" | jq -r '.access_token')
+
+echo "Token Provider A: $TOKEN_PROVIDER_A"
+```
+
+**Opção B — `password` Grant (Provider B):**
+```bash
+export TOKEN_PROVIDER_B=$(curl -s -X POST http://localhost:8000/api/login/oauth/access_token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "client_id=provider-b-client-id" \
+  -d "client_secret=provider-b-client-secret" \
+  -d "username=provider-b" \
+  -d "password=provider-b-secret" \
+  -d "scope=openid profile wagering:write wagering:read" | jq -r '.access_token')
+
+echo "Token Provider B: $TOKEN_PROVIDER_B"
+```
+
+> **Inspecionando o JWKS do Casdoor**:
+> ```bash
+> curl -s http://localhost:8000/.well-known/jwks | jq .
+> ```
+
+#### Passo 3: Chamar os Endpoints Protegidos com o Token
+
+1. **Criar uma Wallet autenticado:**
+```bash
+curl -X POST http://localhost:3000/wallets \
+  -H "Authorization: Bearer $TOKEN_PROVIDER_A" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "playerId": "0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1",
+    "initialBalance": { "amount": "1000.00", "currency": "BRL" }
+  }'
+```
+
+2. **Submeter uma aposta (`BET`) do `provider-a` usando o token do `provider-a` (`200 OK`):**
+```bash
+curl -X POST http://localhost:3000/wagering/transactions \
+  -H "Authorization: Bearer $TOKEN_PROVIDER_A" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: provider-a:tx-auth-001" \
+  -d '{
+    "providerId": "provider-a",
+    "externalTransactionId": "tx-auth-001",
+    "playerId": "0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1",
+    "walletId": "<WALLET_ID>",
+    "roundId": "round-100",
+    "gameId": "fortune-chimp",
+    "kind": "BET",
+    "money": { "amount": "25.00", "currency": "BRL" }
+  }'
+```
+
+3. **Testar o bloqueio de falsificação entre provedores (`403 Forbidden`):**
+Se o `provider-a` tentar submeter uma transação em nome do `provider-b`:
+```bash
+curl -i -X POST http://localhost:3000/wagering/transactions \
+  -H "Authorization: Bearer $TOKEN_PROVIDER_A" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: spoof-attempt-001" \
+  -d '{
+    "providerId": "provider-b",
+    "externalTransactionId": "tx-spoof-001",
+    "playerId": "0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1",
+    "walletId": "<WALLET_ID>",
+    "roundId": "round-100",
+    "gameId": "fortune-chimp",
+    "kind": "BET",
+    "money": { "amount": "25.00", "currency": "BRL" }
+  }'
+# Retorna HTTP/1.1 403 Forbidden:
+# {"statusCode":403,"message":"Authenticated provider 'provider-a' is not authorized to submit transactions for provider 'provider-b'","error":"Forbidden"}
+```
+
+---
+
+## 3. Desenvolvimento Local e Comandos
 
 ### Pré-requisitos
 - **Docker** & **Docker Compose**
@@ -155,8 +309,8 @@ bun install
 # 2. Configuração local (opcional se for usar só os defaults de .env.example)
 cp .env.example .env
 
-# 3. Subir PostgreSQL e LocalStack em containers
-docker compose -f infra/docker-compose.yaml up -d postgres localstack
+# 3. Subir PostgreSQL, LocalStack e Casdoor em containers
+docker compose -f infra/docker-compose.yaml up -d postgres localstack casdoor
 
 # 4. Executar migrations versionadas
 bun run migration:up
@@ -168,29 +322,29 @@ bun run migration:down
 bun run start
 ```
 
-Esse fluxo sobe só o banco e as filas. A API roda no host, então as migrations **não** são aplicadas pela `app-1`. Use `bun run migration:up` aqui. Na stack completa da seção 1 esse comando não é necessário.
+Esse fluxo sobe só o banco, as filas e o IdP. A API roda no host, então as migrations **não** são aplicadas pela `app-1`. Use `bun run migration:up` aqui. Na stack completa da seção 1 esse comando não é necessário.
 
 ---
 
-## 3. Executando os Testes
+## 4. Executando os Testes
 
-Os testes de unidade e o `bun run typecheck` não usam Docker. Os testes de **integração**, **concorrência** e o **teste de carga** falam com PostgreSQL 16 e LocalStack SQS reais. Suba esses dois serviços antes de rodá-los. As três instâncias da API não precisam estar no ar: cada teste sobe os próprios processos NestJS.
+Os testes de unidade e o `bun run typecheck` não usam Docker. Os testes de **integração**, **concorrência** e o **teste de carga** falam com PostgreSQL 16, LocalStack SQS e Casdoor reais. Suba esses três serviços antes de rodá-los. As três instâncias da API não precisam estar no ar: cada teste sobe os próprios processos NestJS.
 
 ```bash
-docker compose up -d postgres localstack
+docker compose up -d postgres localstack casdoor
 docker compose ps
 ```
 
-Espere `postgres` e `localstack` ficarem `healthy` no `docker compose ps`. Se a subida falhar, o detalhe está em `docker compose logs postgres` e `docker compose logs localstack`.
+Espere `postgres`, `localstack` e `casdoor` ficarem `healthy` no `docker compose ps`. Se a subida falhar, o detalhe está em `docker compose logs postgres`, `docker compose logs localstack` e `docker compose logs casdoor`.
 
 ```bash
 # Executar toda a suíte (Unidade + Integração + Concorrência)
 bun test
 
-# Apenas testes de unidade (Money, Wallet, WagerTransaction, PayloadHash, Eventos)
+# Apenas testes de unidade (Money, Wallet, WagerTransaction, PayloadHash, Eventos, Auth JWKS RS256, OTel)
 bun run test:unit
 
-# Apenas testes de integração (Migrations, Constraints SQL, Trigger de Imutabilidade, API HTTP, SQS, Inbox, Outbox, DLQ)
+# Apenas testes de integração (Migrations, Constraints SQL, Trigger de Imutabilidade, API HTTP, Casdoor OAuth2/JWKS E2E, SQS, Inbox, Outbox, DLQ)
 bun run test:integration
 
 # Apenas testes de concorrência (50 apostas idênticas em paralelo, disputa 100 BRL vs 2x 80 BRL, >= 3 instâncias, crash antes do ack, 2 publishers na outbox, REFUND/ROLLBACK fora de ordem, restart recovery)
@@ -205,9 +359,11 @@ bun run typecheck
 
 ---
 
-## 4. Endpoints da API HTTP
+## 5. Endpoints da API HTTP
 
-### 4.1 Criar Wallet
+> **Nota**: Quando `AUTH_MODE=noop` (padrão), o header `Authorization` é opcional. Quando `AUTH_MODE=casdoor` (ou `strict`), inclua `-H "Authorization: Bearer $TOKEN_PROVIDER_A"` nas chamadas abaixo (veja a Seção 2.4).
+
+### 5.1 Criar Wallet
 ```bash
 curl -X POST http://localhost:3000/wallets \
   -H "Content-Type: application/json" \
@@ -217,7 +373,7 @@ curl -X POST http://localhost:3000/wallets \
   }'
 ```
 
-### 4.2 Submeter Transação de Aposta (`BET`, `WIN`, `LOSS`, `REFUND`, `ROLLBACK`)
+### 5.2 Submeter Transação de Aposta (`BET`, `WIN`, `LOSS`, `REFUND`, `ROLLBACK`)
 ```bash
 curl -X POST http://localhost:3000/wagering/transactions \
   -H "Content-Type: application/json" \
@@ -234,7 +390,7 @@ curl -X POST http://localhost:3000/wagering/transactions \
   }'
 ```
 
-### 4.3 Consultas e Reconciliação
+### 5.3 Consultas e Reconciliação
 ```bash
 # Consultar saldo e versão da wallet
 curl http://localhost:3000/wallets/<WALLET_ID>
@@ -252,7 +408,7 @@ curl http://localhost:3000/providers/provider-a/wagering/transactions/transactio
 curl -X POST http://localhost:3000/wallets/<WALLET_ID>/reconciliation
 ```
 
-### 4.4 Observabilidade e Health Checks
+### 5.4 Observabilidade e Health Checks
 ```bash
 # Liveness probe (não requer autenticação)
 curl http://localhost:3000/health/live
@@ -260,9 +416,9 @@ curl http://localhost:3000/health/live
 # Readiness probe — valida conectividade real com PostgreSQL e SQS (não requer autenticação)
 curl http://localhost:3000/health/ready
 
-# Métricas no formato Prometheus
+# Métricas no formato Prometheus (não requer autenticação)
 curl http://localhost:3000/metrics
 
-# Métricas em snapshot JSON
+# Métricas em snapshot JSON (não requer autenticação)
 curl http://localhost:3000/metrics/json
 ```
