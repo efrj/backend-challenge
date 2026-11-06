@@ -23,17 +23,96 @@ infra/
 
 > **Nota sobre Storage**: O domínio deste desafio utiliza exclusivamente **PostgreSQL** (transacional) e **AWS SQS** (mensageria), não exigindo Object Storage (como S3/RustFS). Todos os volumes persistentes de banco de dados e mensageria estão mapeados para subdiretórios dentro de `infra/data/`.
 
-### Subindo toda a stack com Docker Compose (3 instâncias + Postgres + LocalStack)
+Os comandos abaixo rodam na **raiz do repositório**. O `docker-compose.yaml` da raiz inclui `infra/docker-compose.yaml`. O mesmo efeito sai de `docker compose -f infra/docker-compose.yaml ...`.
+
+### Pré-requisitos
+
+- **Docker** e **Docker Compose** v2 (`docker compose`, não o binário antigo `docker-compose`)
+
+O Bun só entra se a API ou os testes forem executados no host. A stack completa sobe sem instalar dependências na máquina.
+
+### Configuração
+
+As variáveis ficam em [`.env.example`](./.env.example). O Compose carrega esse arquivo nos containers da API e, se existir, também o `.env` da raiz (este último prevalece). Dentro da rede, só estes valores mudam em relação ao exemplo: `DB_HOST=postgres`, `SQS_ENDPOINT=http://localstack:4566`, `INSTANCE_ID` e `AUTO_MIGRATE`.
 
 ```bash
-docker compose -f infra/docker-compose.yaml up -d --build
+cp .env.example .env   # opcional; sem este arquivo os defaults do exemplo valem
 ```
-*(Ou simplesmente `docker compose up -d --build` na raiz do projeto, que inclui `infra/docker-compose.yaml`).*
 
-As 3 instâncias da aplicação ficam expostas em:
+Postgres e LocalStack recebem usuário, senha, banco e nomes de fila pelas mesmas variáveis. Para trocar algum desses valores, edite o `.env` e recrie os containers.
+
+### Subindo toda a stack (3 instâncias + Postgres + LocalStack)
+
+```bash
+docker compose up -d --build
+```
+
+O `--build` gera a imagem Bun das três instâncias. Na primeira subida o Postgres e o LocalStack precisam ficar saudáveis antes das APIs; o Compose já espera esses healthchecks. A `app-2` e a `app-3` só iniciam depois que a `app-1` responde em `/health/ready`.
+
+As instâncias ficam expostas em:
+
 - **Instância 1 (`app-1`)**: `http://localhost:3000`
 - **Instância 2 (`app-2`)**: `http://localhost:3001`
 - **Instância 3 (`app-3`)**: `http://localhost:3002`
+- **PostgreSQL**: `localhost:5432`
+- **LocalStack (SQS)**: `http://localhost:4566`
+
+### Migrations
+
+Na stack completa **não** rode `bun run migration:up`. A `app-1` sobe com `AUTO_MIGRATE=true` e aplica as migrations versionadas na inicialização. A `app-2` e a `app-3` sobem com `AUTO_MIGRATE=false` para não disputar o mesmo schema.
+
+O comando `bun run migration:up` existe só para o fluxo em que a API roda no host (seção 2).
+
+### Healthchecks e logs
+
+`docker compose up -d` devolve o terminal assim que os containers são criados. A API pode ainda estar subindo. Confira o estado e acompanhe a saída:
+
+```bash
+# Estado de cada serviço. postgres, localstack e app-1 devem chegar em healthy
+docker compose ps
+
+# Logs de toda a stack, em tempo real
+docker compose logs -f
+
+# Logs de um serviço só
+docker compose logs -f app-1
+docker compose logs -f postgres
+docker compose logs -f localstack
+```
+
+Saia do acompanhamento de logs com `Ctrl+C`. Isso não para os containers.
+
+Quando a `app-1` estiver `healthy`, as três instâncias respondem:
+
+```bash
+curl http://localhost:3000/health/live
+curl http://localhost:3000/health/ready
+curl http://localhost:3001/health/ready
+curl http://localhost:3002/health/ready
+```
+
+`/health/live` só confirma que o processo está no ar. `/health/ready` consulta PostgreSQL e SQS e devolve `200` quando os dois estão acessíveis. Nenhum dos dois exige autenticação.
+
+### Parar e recriar os containers
+
+```bash
+# Para os containers e mantém a configuração para um próximo start
+docker compose stop
+
+# Sobe de novo os containers já criados, sem rebuild
+docker compose start
+
+# Remove containers e a rede do projeto. Os dados em infra/data/ permanecem
+docker compose down
+
+# Recria a stack e reconstrói a imagem da API depois de mudar código ou o .env
+docker compose up -d --build
+
+# Recria os containers mesmo sem mudança detectada na imagem
+docker compose up -d --build --force-recreate
+```
+
+Os dados do Postgres e do LocalStack ficam em `infra/data/postgres` e `infra/data/localstack`. `docker compose down` não apaga esses diretórios. Para zerar o banco e as filas, pare a stack e apague o conteúdo desses diretórios antes de subir de novo.
 
 ---
 
@@ -52,8 +131,6 @@ cp .env.example .env
 ```
 
 O Bun carrega `.env` sozinho. Se o arquivo não existir e `NODE_ENV` não for `production`, os valores que faltarem são preenchidos a partir de `.env.example`.
-
-O Compose injeta o mesmo arquivo nos containers e sobrescreve só o que muda dentro da rede: `DB_HOST=postgres`, `SQS_ENDPOINT=http://localstack:4566`, `INSTANCE_ID` e `AUTO_MIGRATE` (apenas `app-1` migra). Postgres e LocalStack usam as mesmas variáveis, com default igual ao exemplo quando não há `.env`. Para trocar usuário, senha ou fila, edite `.env` e suba a stack de novo.
 
 ### Instalação e Setup Local
 
@@ -77,11 +154,20 @@ bun run migration:down
 bun run start
 ```
 
+Esse fluxo sobe só o banco e as filas. A API roda no host, então as migrations **não** são aplicadas pela `app-1`. Use `bun run migration:up` aqui. Na stack completa da seção 1 esse comando não é necessário.
+
 ---
 
 ## 3. Executando os Testes
 
-Todos os testes de integração e concorrência rodam contra instâncias **reais** do PostgreSQL 16 e do LocalStack SQS em containers Docker (sem substituir o banco ou filas por mocks):
+Os testes de unidade e o `bun run typecheck` não usam Docker. Os testes de **integração**, **concorrência** e o **teste de carga** falam com PostgreSQL 16 e LocalStack SQS reais. Suba esses dois serviços antes de rodá-los. As três instâncias da API não precisam estar no ar: cada teste sobe os próprios processos NestJS.
+
+```bash
+docker compose up -d postgres localstack
+docker compose ps
+```
+
+Espere `postgres` e `localstack` ficarem `healthy` no `docker compose ps`. Se a subida falhar, o detalhe está em `docker compose logs postgres` e `docker compose logs localstack`.
 
 ```bash
 # Executar toda a suíte (Unidade + Integração + Concorrência)
