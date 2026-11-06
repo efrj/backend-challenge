@@ -62,18 +62,41 @@
             "body": {
               "mode": "urlencoded",
               "urlencoded": [
-                { "key": "grant_type", "value": "client_credentials", "type": "text" },
-                { "key": "client_id", "value": "provider-a-client-id", "type": "text" },
-                { "key": "client_secret", "value": "provider-a-client-secret", "type": "text" },
-                { "key": "scope", "value": "openid profile wagering:write wagering:read", "type": "text" }
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "provider-a-client-id",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "provider-a-client-secret",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile wagering:write wagering:read",
+                  "type": "text"
+                }
               ]
             },
             "url": {
               "raw": "http://localhost:8000/api/login/oauth/access_token",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "8000",
-              "path": ["api", "login", "oauth", "access_token"]
+              "path": [
+                "api",
+                "login",
+                "oauth",
+                "access_token"
+              ]
             }
           }
         },
@@ -93,18 +116,41 @@
             "body": {
               "mode": "urlencoded",
               "urlencoded": [
-                { "key": "grant_type", "value": "client_credentials", "type": "text" },
-                { "key": "client_id", "value": "provider-b-client-id", "type": "text" },
-                { "key": "client_secret", "value": "provider-b-client-secret", "type": "text" },
-                { "key": "scope", "value": "openid profile wagering:write wagering:read", "type": "text" }
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "provider-b-client-id",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "provider-b-client-secret",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile wagering:write wagering:read",
+                  "type": "text"
+                }
               ]
             },
             "url": {
               "raw": "http://localhost:8000/api/login/oauth/access_token",
               "protocol": "http",
-              "host": ["localhost"],
+              "host": [
+                "localhost"
+              ],
               "port": "8000",
-              "path": ["api", "login", "oauth", "access_token"]
+              "path": [
+                "api",
+                "login",
+                "oauth",
+                "access_token"
+              ]
             }
           }
         }
@@ -118,8 +164,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-correlation-id", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-correlation-id",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -127,8 +179,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/wallets",
-              "host": ["{{baseUrl}}"],
-              "path": ["wallets"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets"
+              ]
             }
           }
         },
@@ -139,8 +195,13 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/wallets/{{walletId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["wallets", "{{walletId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets",
+                "{{walletId}}"
+              ]
             }
           }
         },
@@ -151,11 +212,24 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/wallets/{{walletId}}/ledger?limit=50",
-              "host": ["{{baseUrl}}"],
-              "path": ["wallets", "{{walletId}}", "ledger"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets",
+                "{{walletId}}",
+                "ledger"
+              ],
               "query": [
-                { "key": "limit", "value": "50" },
-                { "key": "cursor", "value": "", "disabled": true }
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -165,12 +239,21 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "x-correlation-id", "value": "{{$guid}}" }
+              {
+                "key": "x-correlation-id",
+                "value": "{{$guid}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/wallets/{{walletId}}/reconciliation",
-              "host": ["{{baseUrl}}"],
-              "path": ["wallets", "{{walletId}}", "reconciliation"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets",
+                "{{walletId}}",
+                "reconciliation"
+              ]
             }
           }
         }
@@ -184,9 +267,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{providerId}}:bet-{{$timestamp}}" },
-              { "key": "x-correlation-id", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{providerId}}:bet-{{$timestamp}}"
+              },
+              {
+                "key": "x-correlation-id",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -194,8 +286,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/wagering/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["wagering", "transactions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -204,9 +301,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{providerId}}:win-{{$timestamp}}" },
-              { "key": "x-correlation-id", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{providerId}}:win-{{$timestamp}}"
+              },
+              {
+                "key": "x-correlation-id",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -214,8 +320,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/wagering/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["wagering", "transactions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -224,9 +335,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{providerId}}:loss-{{$timestamp}}" },
-              { "key": "x-correlation-id", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{providerId}}:loss-{{$timestamp}}"
+              },
+              {
+                "key": "x-correlation-id",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -234,8 +354,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/wagering/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["wagering", "transactions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -244,9 +369,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{providerId}}:refund-{{$timestamp}}" },
-              { "key": "x-correlation-id", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{providerId}}:refund-{{$timestamp}}"
+              },
+              {
+                "key": "x-correlation-id",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -254,8 +388,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/wagering/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["wagering", "transactions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -266,10 +405,19 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/wagering/transactions/:transactionId",
-              "host": ["{{baseUrl}}"],
-              "path": ["wagering", "transactions", ":transactionId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wagering",
+                "transactions",
+                ":transactionId"
+              ],
               "variable": [
-                { "key": "transactionId", "value": "" }
+                {
+                  "key": "transactionId",
+                  "value": ""
+                }
               ]
             }
           }
@@ -281,11 +429,25 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/providers/:providerId/wagering/transactions/:externalTransactionId",
-              "host": ["{{baseUrl}}"],
-              "path": ["providers", ":providerId", "wagering", "transactions", ":externalTransactionId"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "providers",
+                ":providerId",
+                "wagering",
+                "transactions",
+                ":externalTransactionId"
+              ],
               "variable": [
-                { "key": "providerId", "value": "provider-a" },
-                { "key": "externalTransactionId", "value": "" }
+                {
+                  "key": "providerId",
+                  "value": "provider-a"
+                },
+                {
+                  "key": "externalTransactionId",
+                  "value": ""
+                }
               ]
             }
           }
@@ -298,52 +460,79 @@
         {
           "name": "Health Live Probe",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health/live",
-              "host": ["{{baseUrl}}"],
-              "path": ["health", "live"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "live"
+              ]
             }
           }
         },
         {
           "name": "Health Ready Probe",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health/ready",
-              "host": ["{{baseUrl}}"],
-              "path": ["health", "ready"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
             }
           }
         },
         {
           "name": "Métricas Prometheus",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/metrics",
-              "host": ["{{baseUrl}}"],
-              "path": ["metrics"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ]
             }
           }
         },
         {
           "name": "Métricas Snapshot JSON",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/metrics/json",
-              "host": ["{{baseUrl}}"],
-              "path": ["metrics", "json"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics",
+                "json"
+              ]
             }
           }
         }
