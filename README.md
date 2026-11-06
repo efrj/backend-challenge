@@ -139,7 +139,125 @@ Os dados do Postgres, do LocalStack e do Casdoor ficam em `infra/data/postgres`,
 
 ---
 
-## 2. Autenticação e Autorização com Casdoor (OIDC / OAuth2 + JWKS)
+## 2. Guia Rápido: O que fazer após subir o projeto para ver tudo acontecer?
+
+Após rodar `docker compose up -d --build`, você tem um **cluster distribuído completo** ativo na máquina (3 instâncias da API, PostgreSQL, LocalStack SQS, Casdoor IAM, OpenTelemetry Collector, Tempo, Prometheus e Grafana).
+
+Siga o roteiro prático abaixo para interagir com o sistema e observar todas as garantias financeiras, métricas e traces em tempo real:
+
+### 2.1 Abrir as Interfaces Visuais no Navegador
+
+1. **Dashboard do Grafana**: [`http://localhost:3003`](http://localhost:3003)
+   - Acesso anônimo pré-configurado (não exige login).
+   - Visualize em tempo real: transações por status, duplicatas, outbox lag, latência p95, taxa de autenticação e tentativas 403.
+2. **Console do Casdoor (IAM / OIDC)**: [`http://localhost:8000`](http://localhost:8000)
+   - Login: `admin` / Senha: `123`.
+   - Inspecione a organização `jungle`, as aplicações dos provedores (`provider-a`, `provider-b`) e o certificado RSA `RS256`.
+
+---
+
+### 2.2 Executar um Fluxo Financeiro Completo via Terminal
+
+Abra um terminal e rode a sequência de comandos abaixo (copie e cole):
+
+```bash
+# 1. Criar uma Wallet para um jogador com saldo inicial de R$ 1.000,00
+WALLET_RES=$(curl -s -X POST http://localhost:3000/wallets \
+  -H "Content-Type: application/json" \
+  -d '{
+    "playerId": "0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1",
+    "initialBalance": { "amount": "1000.00", "currency": "BRL" }
+  }')
+echo $WALLET_RES | jq .
+WALLET_ID=$(echo $WALLET_RES | jq -r '.id')
+echo "Carteira Criada: $WALLET_ID"
+
+# 2. Fazer uma Aposta (BET) de R$ 100,00 na Instância 1 (porta 3000)
+# O saldo cai atomicamente para R$ 900,00
+curl -s -X POST http://localhost:3000/wagering/transactions \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: provider-a:tx-bet-100" \
+  -d "{
+    \"providerId\": \"provider-a\",
+    \"externalTransactionId\": \"tx-bet-100\",
+    \"playerId\": \"0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1\",
+    \"walletId\": \"$WALLET_ID\",
+    \"roundId\": \"round-1\",
+    \"gameId\": \"fortune-chimp\",
+    \"kind\": \"BET\",
+    \"money\": { \"amount\": \"100.00\", \"currency\": \"BRL\" }
+  }" | jq .
+
+# 3. Testar Idempotência Imediata: Enviar a MESMA aposta na Instância 2 (porta 3001)
+# Retorna 200 OK com idempotentReplay: true SEM descontar o saldo novamente!
+curl -s -X POST http://localhost:3001/wagering/transactions \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: provider-a:tx-bet-100" \
+  -d "{
+    \"providerId\": \"provider-a\",
+    \"externalTransactionId\": \"tx-bet-100\",
+    \"playerId\": \"0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1\",
+    \"walletId\": \"$WALLET_ID\",
+    \"roundId\": \"round-1\",
+    \"gameId\": \"fortune-chimp\",
+    \"kind\": \"BET\",
+    \"money\": { \"amount\": \"100.00\", \"currency\": \"BRL\" }
+  }" | jq .
+
+# 4. Registrar um Ganho (WIN) de R$ 250,00 na Instância 3 (porta 3002)
+# O saldo sobe para R$ 1.150,00 (900 + 250)
+curl -s -X POST http://localhost:3002/wagering/transactions \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: provider-a:tx-win-250" \
+  -d "{
+    \"providerId\": \"provider-a\",
+    \"externalTransactionId\": \"tx-win-250\",
+    \"playerId\": \"0192f28f-5dc0-7d58-bdb2-814ad6a0f4a1\",
+    \"walletId\": \"$WALLET_ID\",
+    \"roundId\": \"round-1\",
+    \"gameId\": \"fortune-chimp\",
+    \"kind\": \"WIN\",
+    \"money\": { \"amount\": \"250.00\", \"currency\": \"BRL\" }
+  }" | jq .
+
+# 5. Auditar o Extrato Imutável (Ledger) da Carteira
+# Exibe os 3 lançamentos perfeitamente encadeados e balanceados (OPENING, DEBIT, CREDIT)
+curl -s "http://localhost:3000/wallets/$WALLET_ID/ledger" | jq .
+
+# 6. Executar a Reconciliação Contábil da Carteira
+# Comprova matematicamente que o saldo armazenado bate 100% com a soma dos lançamentos do ledger
+curl -s -X POST "http://localhost:3000/wallets/$WALLET_ID/reconciliation" | jq .
+```
+
+---
+
+### 2.3 Ver a Observabilidade Acontecendo em Tempo Real
+
+1. **Dashboard do Grafana (`http://localhost:3003`)**:
+   - Os painéis **Transações por status** e **Duplicatas detectadas** refletirão instantaneamente as operações executadas acima.
+2. **Distributed Tracing no Tempo**:
+   - No Grafana, acesse o menu lateral **Explore** > Datasource **Tempo**.
+   - No modo de busca (*Search* ou *TraceQL*), clique em **Run query** para ver a linha do tempo das requisições HTTP e da publicação da outbox para a fila SQS.
+   - Abra um trace para auditar a árvore de chamadas, a latência de cada etapa e os atributos de auditoria (`caller.provider_id`, `url.path`, `correlation.id`).
+3. **Logs Estruturados**:
+   - No terminal, visualize os logs JSON unificados emitidos pelas instâncias:
+     ```bash
+     docker compose logs -f app-1
+     ```
+
+---
+
+### 2.4 Executar o Teste de Carga Automatizado
+
+Para estressar as 3 instâncias em paralelo com 300 requisições simultâneas e disputa de saldo (*hot wallet*):
+```bash
+bun run test:load
+```
+O benchmark exibirá throughput (~450 req/s), latências p50/p95 e comprovação de integridade financeira de 100%.
+
+---
+
+## 3. Autenticação e Autorização com Casdoor (OIDC / OAuth2 + JWKS)
 
 ### 2.1 Por que escolhemos o Casdoor?
 
@@ -284,7 +402,7 @@ curl -i -X POST http://localhost:3000/wagering/transactions \
 
 ---
 
-## 3. Desenvolvimento Local e Comandos
+## 4. Desenvolvimento Local e Comandos
 
 ### Pré-requisitos
 - **Docker** & **Docker Compose**
@@ -326,7 +444,7 @@ Esse fluxo sobe só o banco, as filas e o IdP. A API roda no host, então as mig
 
 ---
 
-## 4. Executando os Testes
+## 5. Executando os Testes
 
 Os testes de unidade e o `bun run typecheck` não usam Docker. Os testes de **integração**, **concorrência** e o **teste de carga** falam com PostgreSQL 16, LocalStack SQS e Casdoor reais. Suba esses três serviços antes de rodá-los. As três instâncias da API não precisam estar no ar: cada teste sobe os próprios processos NestJS.
 
@@ -359,7 +477,7 @@ bun run typecheck
 
 ---
 
-## 5. Endpoints da API HTTP
+## 6. Endpoints da API HTTP
 
 > **Nota**: Quando `AUTH_MODE=noop` (padrão), o header `Authorization` é opcional. Quando `AUTH_MODE=casdoor` (ou `strict`), inclua `-H "Authorization: Bearer $TOKEN_PROVIDER_A"` nas chamadas abaixo (veja a Seção 2.4).
 
