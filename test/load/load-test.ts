@@ -20,14 +20,39 @@ function percentile(sorted: number[], p: number): number {
   return Number((sorted[idx] ?? 0).toFixed(2));
 }
 
-async function runLoadBenchmark() {
-  console.log("Starting 3-instance Distributed Wagering Processor cluster for load testing...");
+interface TargetInstance {
+  baseUrl: string;
+  close?: () => Promise<void>;
+}
 
-  const instances: TestAppInstance[] = await Promise.all([
-    createTestAppInstance({ workersEnabled: true, instanceId: "load-node-1" }),
-    createTestAppInstance({ workersEnabled: true, instanceId: "load-node-2" }),
-    createTestAppInstance({ workersEnabled: true, instanceId: "load-node-3" }),
-  ]);
+async function runLoadBenchmark() {
+  const targetEnv = process.env.LOAD_TEST_TARGET?.toLowerCase();
+  const useDockerCluster =
+    targetEnv === "docker" ||
+    targetEnv === "cluster" ||
+    targetEnv === "remote";
+
+  let instances: TargetInstance[];
+
+  if (useDockerCluster) {
+    console.log(
+      "Running load benchmark against live Docker Compose cluster (app-1:3000, app-2:3001, app-3:3002)...",
+    );
+    instances = [
+      { baseUrl: "http://localhost:3000" },
+      { baseUrl: "http://localhost:3001" },
+      { baseUrl: "http://localhost:3002" },
+    ];
+  } else {
+    console.log(
+      "Starting 3-instance Distributed Wagering Processor cluster for load testing...",
+    );
+    instances = await Promise.all([
+      createTestAppInstance({ workersEnabled: true, instanceId: "load-node-1" }),
+      createTestAppInstance({ workersEnabled: true, instanceId: "load-node-2" }),
+      createTestAppInstance({ workersEnabled: true, instanceId: "load-node-3" }),
+    ]);
+  }
 
   const walletIds: string[] = [];
   const samples: LoadSample[] = [];
@@ -151,10 +176,24 @@ async function runLoadBenchmark() {
 
     // Wait briefly for background outbox publishers to drain
     await new Promise((r) => setTimeout(r, 600));
-    await Promise.all(instances.map((i) => i.outboxWorker.publishBatch(100)));
-
-    // Verify 100% ledger reconciliation invariant across all 20 wallets
-    await assertAllWalletsConsistent(instances[0]!, walletIds);
+    if (!useDockerCluster) {
+      await Promise.all(
+        (instances as TestAppInstance[]).map((i) => i.outboxWorker.publishBatch(100)),
+      );
+      // Verify 100% ledger reconciliation invariant across all 20 wallets
+      await assertAllWalletsConsistent(instances[0] as TestAppInstance, walletIds);
+    } else {
+      // Reconcile via HTTP endpoint on Docker cluster
+      for (const wid of walletIds) {
+        const recRes = await fetch(`http://localhost:3000/wallets/${wid}/reconciliation`, {
+          method: "POST",
+        });
+        const recData = (await recRes.json()) as { consistent: boolean };
+        if (!recData.consistent) {
+          throw new Error(`Wallet ${wid} reconciliation failed on Docker cluster`);
+        }
+      }
+    }
 
     const durations = samples.map((s) => s.durationMs).sort((a, b) => a - b);
     const totalRequests = samples.length;
@@ -228,7 +267,11 @@ async function runLoadBenchmark() {
     console.log("\n=== LOAD TEST REPORT ===");
     console.log(JSON.stringify(report, null, 2));
   } finally {
-    await Promise.all(instances.map((i) => i.close()));
+    if (!useDockerCluster) {
+      await Promise.all(
+        instances.map((i) => i.close && i.close()),
+      );
+    }
   }
 }
 
