@@ -85,7 +85,18 @@
               ]
             },
             "url": {
-              "raw": "http://localhost:8000/api/login/oauth/access_token"
+              "raw": "http://localhost:8000/api/login/oauth/access_token",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "login",
+                "oauth",
+                "access_token"
+              ]
             }
           }
         },
@@ -128,7 +139,18 @@
               ]
             },
             "url": {
-              "raw": "http://localhost:8000/api/login/oauth/access_token"
+              "raw": "http://localhost:8000/api/login/oauth/access_token",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "login",
+                "oauth",
+                "access_token"
+              ]
             }
           }
         }
@@ -156,7 +178,15 @@
               "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"initialBalance\": {\n    \"amount\": \"1000.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wallets"
+              "raw": "http://localhost:3000/wallets",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wallets"
+              ]
             }
           }
         },
@@ -166,7 +196,22 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/wallets/{{walletId}}"
+              "raw": "http://localhost:3000/wallets/:walletId",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wallets",
+                ":walletId"
+              ],
+              "variable": [
+                {
+                  "key": "walletId",
+                  "value": "{{walletId}}"
+                }
+              ]
             }
           }
         },
@@ -176,7 +221,17 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/wallets/{{walletId}}/ledger?limit=50",
+              "raw": "http://localhost:3000/wallets/:walletId/ledger?limit=50",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wallets",
+                ":walletId",
+                "ledger"
+              ],
               "query": [
                 {
                   "key": "limit",
@@ -186,6 +241,12 @@
                   "key": "cursor",
                   "value": "",
                   "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "walletId",
+                  "value": "{{walletId}}"
                 }
               ]
             }
@@ -202,7 +263,23 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/wallets/{{walletId}}/reconciliation"
+              "raw": "http://localhost:3000/wallets/:walletId/reconciliation",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wallets",
+                ":walletId",
+                "reconciliation"
+              ],
+              "variable": [
+                {
+                  "key": "walletId",
+                  "value": "{{walletId}}"
+                }
+              ]
             }
           }
         }
@@ -234,7 +311,16 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"bet-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"BET\",\n  \"money\": {\n    \"amount\": \"25.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions"
+              "raw": "http://localhost:3000/wagering/transactions",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -261,7 +347,16 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"win-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"WIN\",\n  \"money\": {\n    \"amount\": \"50.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions"
+              "raw": "http://localhost:3000/wagering/transactions",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -288,7 +383,16 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"loss-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"LOSS\",\n  \"money\": {\n    \"amount\": \"0.00\",\n    \"currency\": \"BRL\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions"
+              "raw": "http://localhost:3000/wagering/transactions",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -315,7 +419,16 @@
               "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"externalTransactionId\": \"refund-{{$timestamp}}\",\n  \"playerId\": \"{{playerId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"roundId\": \"round-101\",\n  \"gameId\": \"fortune-chimp\",\n  \"kind\": \"REFUND\",\n  \"money\": {\n    \"amount\": \"25.00\",\n    \"currency\": \"BRL\"\n  },\n  \"referenceExternalTransactionId\": \"<ORIGINAL_BET_EXTERNAL_ID>\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions"
+              "raw": "http://localhost:3000/wagering/transactions",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wagering",
+                "transactions"
+              ]
             }
           }
         },
@@ -325,7 +438,17 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/wagering/transactions/:transactionId",
+              "raw": "http://localhost:3000/wagering/transactions/:transactionId",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "wagering",
+                "transactions",
+                ":transactionId"
+              ],
               "variable": [
                 {
                   "key": "transactionId",
@@ -341,7 +464,19 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/providers/:providerId/wagering/transactions/:externalTransactionId",
+              "raw": "http://localhost:3000/providers/:providerId/wagering/transactions/:externalTransactionId",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "providers",
+                ":providerId",
+                "wagering",
+                "transactions",
+                ":externalTransactionId"
+              ],
               "variable": [
                 {
                   "key": "providerId",
@@ -369,7 +504,16 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/health/live"
+              "raw": "http://localhost:3000/health/live",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "health",
+                "live"
+              ]
             }
           }
         },
@@ -382,7 +526,16 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/health/ready"
+              "raw": "http://localhost:3000/health/ready",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "health",
+                "ready"
+              ]
             }
           }
         },
@@ -395,7 +548,15 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/metrics"
+              "raw": "http://localhost:3000/metrics",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "metrics"
+              ]
             }
           }
         },
@@ -408,7 +569,16 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/metrics/json"
+              "raw": "http://localhost:3000/metrics/json",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "metrics",
+                "json"
+              ]
             }
           }
         }
